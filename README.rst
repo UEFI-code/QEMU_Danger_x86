@@ -1,5 +1,13 @@
 ===========
-QEMU README
+QEMU DANGER README
+===========
+
+QEMU DANGERわ、QEMUのForkです。これわ仮想x86/64 CPU権限の無視する。
+
+例えば、もしRing3のプログラムがRing0の命令を実行ができる。
+
+面白いでしょう？
+
 ===========
 
 QEMU is a generic and open source machine & userspace emulator and
