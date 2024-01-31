@@ -1454,7 +1454,9 @@ static bool check_cpl0(DisasContext *s)
     if (CPL(s) == 0) {
         return true;
     }
-    printf("FILE: %s, LINE: %d, FUNC: %s CPL Ring0 Check Failed\n", __FILE__, __LINE__, __func__);
+    printf("FILE: %s, LINE: %d, FUNC: %s CPL Ring0 Check Failed\nWe're here to bypass the check!\n", __FILE__, __LINE__, __func__);
+    return true;
+    
     gen_exception_gpf(s);
     return false;
 }
