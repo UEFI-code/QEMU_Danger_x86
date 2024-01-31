@@ -4,9 +4,9 @@ QEMU DANGER README
 
 QEMU DANGERわ、QEMUのForkです。これわ仮想x86/64 CPU権限の無視する。
 
-例えば、もしRing3のプログラムがRing0の命令を実行ができる。
+例えば、Ring3のプログラムがRing0の命令を実行ができる。DATAの読み書きもできる！
 
-面白いでしょう？
+面白いでしょう？でも、これわ危険です。[WindowsDanger](https://github.com/UEFI-code/WindowsDanger)の一緒に研究です。
 
 ===========
 
