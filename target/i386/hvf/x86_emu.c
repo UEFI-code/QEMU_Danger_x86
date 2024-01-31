@@ -396,6 +396,7 @@ void exec_movzx(CPUX86State *env, struct x86_decode *decode)
 
 static void exec_out(CPUX86State *env, struct x86_decode *decode)
 {
+    printf("FILE: %s, LINE: %d, %s\nExec Out Now!\n", __FILE__, __LINE__, __func__)
     switch (decode->opcode[0]) {
     case 0xe6:
         hvf_handle_io(env_cpu(env), decode->op[0].val, &AL(env), 1, 1, 1);

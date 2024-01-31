@@ -2869,6 +2869,8 @@ MemTxResult address_space_write(AddressSpace *as, hwaddr addr,
 MemTxResult address_space_rw(AddressSpace *as, hwaddr addr, MemTxAttrs attrs,
                              void *buf, hwaddr len, bool is_write)
 {
+    printf("FILE: %s, FUNCTION: %s, LINE: %d\n", __FILE__, __FUNCTION__, __LINE__);
+    printf("Calling address_space_rw, addr: %llx, len: %llx, is_write: %d\n", addr, len, is_write);
     if (is_write) {
         return address_space_write(as, addr, attrs, buf, len);
     } else {
