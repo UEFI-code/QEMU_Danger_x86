@@ -8,7 +8,7 @@ QEMU DANGERわ、QEMUのForkです。これわ仮想x86/64 CPU権限の無視す
 
 .. _WindowsDanger: https://github.com/UEFI-code/WindowsDanger
 
-面白いでしょう？でも、これわ危険です。`WindowsDanger`_の一緒に研究です。
+面白いでしょう？でも、これわ危険です。`WindowsDanger`_ の一緒に研究です。
 
 ===========
 
