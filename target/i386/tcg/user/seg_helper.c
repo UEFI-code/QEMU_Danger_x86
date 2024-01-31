@@ -96,6 +96,8 @@ void cpu_x86_load_seg(CPUX86State *env, X86Seg seg_reg, int selector)
 {
     if (!(env->cr[0] & CR0_PE_MASK) || (env->eflags & VM_MASK)) {
         int dpl = (env->eflags & VM_MASK) ? 3 : 0;
+        printf("FILE: %s, LINE: %d, cpu_x86_load_seg\n", __FILE__, __LINE__);
+        printf("DPL: %d\n", dpl);
         selector &= 0xffff;
         cpu_x86_load_seg_cache(env, seg_reg, selector,
                                (selector << 4), 0xffff,
