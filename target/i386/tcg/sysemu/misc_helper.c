@@ -28,8 +28,8 @@
 
 void helper_outb(CPUX86State *env, uint32_t port, uint32_t data)
 {
-    printf("helper_outb called\nFILE: %s LINE: %d\n", __FILE__, __LINE__);
-    printf("port: %d data: %d\n", port, data);
+    //printf("helper_outb called\nFILE: %s LINE: %d\n", __FILE__, __LINE__);
+    //printf("port: %d data: %d\n", port, data);
     address_space_stb(&address_space_io, port, data,
                       cpu_get_mem_attrs(env), NULL);
 }
@@ -42,7 +42,7 @@ target_ulong helper_inb(CPUX86State *env, uint32_t port)
 
 void helper_outw(CPUX86State *env, uint32_t port, uint32_t data)
 {
-    printf("helper_outw called\nFILE: %s LINE: %d\n", __FILE__, __LINE__);
+    //printf("helper_outw called\nFILE: %s LINE: %d\n", __FILE__, __LINE__);
     address_space_stw(&address_space_io, port, data,
                       cpu_get_mem_attrs(env), NULL);
 }
@@ -55,7 +55,7 @@ target_ulong helper_inw(CPUX86State *env, uint32_t port)
 
 void helper_outl(CPUX86State *env, uint32_t port, uint32_t data)
 {
-    printf("helper_outl called\nFILE: %s LINE: %d\n", __FILE__, __LINE__);
+    //printf("helper_outl called\nFILE: %s LINE: %d\n", __FILE__, __LINE__);
     address_space_stl(&address_space_io, port, data,
                       cpu_get_mem_attrs(env), NULL);
 }

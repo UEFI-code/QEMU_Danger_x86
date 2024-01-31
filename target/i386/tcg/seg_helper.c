@@ -989,6 +989,7 @@ void helper_sysret(CPUX86State *env, int dflag)
     }
     cpl = env->hflags & HF_CPL_MASK;
     if (!(env->cr[0] & CR0_PE_MASK) || cpl != 0) {
+        printf("FILE: %s, LINE: %d Func: %s CPL != 0 exception\n", __FILE__, __LINE__, __func__);
         raise_exception_err_ra(env, EXCP0D_GPF, 0, GETPC());
     }
     selector = (env->star >> 48) & 0xffff;
@@ -1164,6 +1165,7 @@ void do_interrupt_x86_hardirq(CPUX86State *env, int intno, int is_hw)
 
 void helper_lldt(CPUX86State *env, int selector)
 {
+    //printf("FILE: %s, LINE: %d, FUNC: %s\n", __FILE__, __LINE__, __func__);
     SegmentCache *dt;
     uint32_t e1, e2;
     int index, entry_limit;
@@ -1282,6 +1284,7 @@ void helper_ltr(CPUX86State *env, int selector)
 /* only works if protected mode and not VM86. seg_reg must be != R_CS */
 void helper_load_seg(CPUX86State *env, int seg_reg, int selector)
 {
+    //printf("FILE: %s, LINE: %d, FUNC: %s\n", __FILE__, __LINE__, __func__);
     uint32_t e1, e2;
     int cpl, dpl, rpl;
     SegmentCache *dt;
@@ -1297,6 +1300,7 @@ void helper_load_seg(CPUX86State *env, int seg_reg, int selector)
             && (!(env->hflags & HF_CS64_MASK) || cpl == 3)
 #endif
             ) {
+            printf("CPL: %d, will raise exception\n", cpl);
             raise_exception_err_ra(env, EXCP0D_GPF, 0, GETPC());
         }
         cpu_x86_load_seg_cache(env, seg_reg, selector, 0, 0, 0);
@@ -1388,16 +1392,20 @@ void helper_ljmp_protected(CPUX86State *env, int new_cs, target_ulong new_eip,
         dpl = (e2 >> DESC_DPL_SHIFT) & 3;
         if (e2 & DESC_C_MASK) {
             /* conforming code segment */
+            // Hack here!!!
             if (dpl > cpl) {
+                printf("FILE: %s, LINE: %d, FUNC: %s, DPL > CPL, will raise exception\n", __FILE__, __LINE__, __func__);
                 raise_exception_err_ra(env, EXCP0D_GPF, new_cs & 0xfffc, GETPC());
             }
         } else {
             /* non conforming code segment */
             rpl = new_cs & 3;
             if (rpl > cpl) {
+                printf("FILE: %s, LINE: %d, FUNC: %s, RPL > CPL, will raise exception\n", __FILE__, __LINE__, __func__);
                 raise_exception_err_ra(env, EXCP0D_GPF, new_cs & 0xfffc, GETPC());
             }
             if (dpl != cpl) {
+                printf("FILE: %s, LINE: %d, FUNC: %s, DPL != CPL, will raise exception\n", __FILE__, __LINE__, __func__);
                 raise_exception_err_ra(env, EXCP0D_GPF, new_cs & 0xfffc, GETPC());
             }
         }
@@ -1431,6 +1439,7 @@ void helper_ljmp_protected(CPUX86State *env, int new_cs, target_ulong new_eip,
         case 9: /* 386 TSS */
         case 5: /* task gate */
             if (dpl < cpl || dpl < rpl) {
+                printf("FILE: %s, LINE: %d, FUNC: %s, DPL < CPL or DPL < RPL, will raise exception\n", __FILE__, __LINE__, __func__);
                 raise_exception_err_ra(env, EXCP0D_GPF, new_cs & 0xfffc, GETPC());
             }
             switch_tss_ra(env, new_cs, e1, e2, SWITCH_TSS_JMP, next_eip, GETPC());
@@ -1438,6 +1447,7 @@ void helper_ljmp_protected(CPUX86State *env, int new_cs, target_ulong new_eip,
         case 4: /* 286 call gate */
         case 12: /* 386 call gate */
             if ((dpl < cpl) || (dpl < rpl)) {
+                printf("FILE: %s, LINE: %d, FUNC: %s, DPL < CPL or DPL < RPL, will raise exception\n", __FILE__, __LINE__, __func__);
                 raise_exception_err_ra(env, EXCP0D_GPF, new_cs & 0xfffc, GETPC());
             }
             if (!(e2 & DESC_P_MASK)) {
@@ -1559,15 +1569,18 @@ void helper_lcall_protected(CPUX86State *env, int new_cs, target_ulong new_eip,
         if (e2 & DESC_C_MASK) {
             /* conforming code segment */
             if (dpl > cpl) {
+                printf("FILE: %s, LINE: %d, FUNC: %s, DPL > CPL, will raise exception\n", __FILE__, __LINE__, __func__);
                 raise_exception_err_ra(env, EXCP0D_GPF, new_cs & 0xfffc, GETPC());
             }
         } else {
             /* non conforming code segment */
             rpl = new_cs & 3;
             if (rpl > cpl) {
+                printf("FILE: %s, LINE: %d, FUNC: %s, RPL > CPL, will raise exception\n", __FILE__, __LINE__, __func__);
                 raise_exception_err_ra(env, EXCP0D_GPF, new_cs & 0xfffc, GETPC());
             }
             if (dpl != cpl) {
+                printf("FILE: %s, LINE: %d, FUNC: %s, DPL != CPL, will raise exception\n", __FILE__, __LINE__, __func__);
                 raise_exception_err_ra(env, EXCP0D_GPF, new_cs & 0xfffc, GETPC());
             }
         }
@@ -1633,6 +1646,7 @@ void helper_lcall_protected(CPUX86State *env, int new_cs, target_ulong new_eip,
         case 9: /* available 386 TSS */
         case 5: /* task gate */
             if (dpl < cpl || dpl < rpl) {
+                printf("FILE: %s, LINE: %d, FUNC: %s, DPL < CPL or DPL < RPL, will raise exception\n", __FILE__, __LINE__, __func__);
                 raise_exception_err_ra(env, EXCP0D_GPF, new_cs & 0xfffc, GETPC());
             }
             switch_tss_ra(env, new_cs, e1, e2, SWITCH_TSS_CALL, next_eip, GETPC());
@@ -1647,6 +1661,7 @@ void helper_lcall_protected(CPUX86State *env, int new_cs, target_ulong new_eip,
         shift = type >> 3;
 
         if (dpl < cpl || dpl < rpl) {
+            printf("FILE: %s, LINE: %d, FUNC: %s, DPL < CPL or DPL < RPL, will raise exception\n", __FILE__, __LINE__, __func__);
             raise_exception_err_ra(env, EXCP0D_GPF, new_cs & 0xfffc, GETPC());
         }
         /* check valid bit */
@@ -1724,6 +1739,7 @@ void helper_lcall_protected(CPUX86State *env, int new_cs, target_ulong new_eip,
                     raise_exception_err_ra(env, EXCP0A_TSS, ss & 0xfffc, GETPC());
                 }
                 if ((ss & 3) != dpl) {
+                    printf("FILE: %s, LINE: %d, FUNC: %s, SS & 3 != DPL, will raise exception\n", __FILE__, __LINE__, __func__);
                     raise_exception_err_ra(env, EXCP0A_TSS, ss & 0xfffc, GETPC());
                 }
                 if (load_segment_ra(env, &ss_e1, &ss_e2, ss, GETPC()) != 0) {
@@ -1968,10 +1984,12 @@ static inline void helper_ret_protected(CPUX86State *env, int shift,
     dpl = (e2 >> DESC_DPL_SHIFT) & 3;
     if (e2 & DESC_C_MASK) {
         if (dpl > rpl) {
+            printf("FILE: %s, LINE: %d, FUNC: %s, DPL > RPL, will raise exception\n", __FILE__, __LINE__, __func__);
             raise_exception_err_ra(env, EXCP0D_GPF, new_cs & 0xfffc, retaddr);
         }
     } else {
         if (dpl != rpl) {
+            printf("FILE: %s, LINE: %d, FUNC: %s, DPL != RPL, will raise exception\n", __FILE__, __LINE__, __func__);
             raise_exception_err_ra(env, EXCP0D_GPF, new_cs & 0xfffc, retaddr);
         }
     }
@@ -2015,6 +2033,7 @@ static inline void helper_ret_protected(CPUX86State *env, int shift,
             /* NULL ss is allowed in long mode if cpl != 3 */
             /* XXX: test CS64? */
             if ((env->hflags & HF_LMA_MASK) && rpl != 3) {
+                printf("FILE: %s, LINE: %d, FUNC: %s, NULL SS, will raise exception\n", __FILE__, __LINE__, __func__);
                 cpu_x86_load_seg_cache(env, R_SS, new_ss,
                                        0, 0xffffffff,
                                        DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
@@ -2028,6 +2047,7 @@ static inline void helper_ret_protected(CPUX86State *env, int shift,
             }
         } else {
             if ((new_ss & 3) != rpl) {
+                printf("FILE: %s, LINE: %d, FUNC: %s, SS & 3 != RPL, will raise exception\n", __FILE__, __LINE__, __func__);
                 raise_exception_err_ra(env, EXCP0D_GPF, new_ss & 0xfffc, retaddr);
             }
             if (load_segment_ra(env, &ss_e1, &ss_e2, new_ss, retaddr) != 0) {
@@ -2040,6 +2060,7 @@ static inline void helper_ret_protected(CPUX86State *env, int shift,
             }
             dpl = (ss_e2 >> DESC_DPL_SHIFT) & 3;
             if (dpl != rpl) {
+                printf("FILE: %s, LINE: %d, FUNC: %s, DPL != RPL, will raise exception\n", __FILE__, __LINE__, __func__);
                 raise_exception_err_ra(env, EXCP0D_GPF, new_ss & 0xfffc, retaddr);
             }
             if (!(ss_e2 & DESC_P_MASK)) {
@@ -2079,10 +2100,12 @@ static inline void helper_ret_protected(CPUX86State *env, int shift,
         /* NOTE: 'cpl' is the _old_ CPL */
         eflags_mask = TF_MASK | AC_MASK | ID_MASK | RF_MASK | NT_MASK;
         if (cpl == 0) {
+            //printf("FILE: %s, LINE: %d, FUNC: %s, CPL == 0, will set eflags_mask |= IOPL_MASK\n", __FILE__, __LINE__, __func__);
             eflags_mask |= IOPL_MASK;
         }
         iopl = (env->eflags >> IOPL_SHIFT) & 3;
         if (cpl <= iopl) {
+            //printf("FILE: %s, LINE: %d, FUNC: %s, CPL <= IOPL, will set eflags_mask |= IF_MASK\n", __FILE__, __LINE__, __func__);
             eflags_mask |= IF_MASK;
         }
         if (shift == 0) {
@@ -2190,6 +2213,7 @@ void helper_sysexit(CPUX86State *env, int dflag)
 
     cpl = env->hflags & HF_CPL_MASK;
     if (env->sysenter_cs == 0 || cpl != 0) {
+        printf("FILE: %s, LINE: %d, FUNC: %s, sysenter_cs == 0 || CPL != 0, will raise exception\n", __FILE__, __LINE__, __func__);
         raise_exception_err_ra(env, EXCP0D_GPF, 0, GETPC());
     }
 #ifdef TARGET_X86_64
@@ -2351,7 +2375,7 @@ void helper_verr(CPUX86State *env, target_ulong selector1)
     } else {
         if (dpl < cpl || dpl < rpl) {
         fail:
-            CC_SRC = eflags & ~CC_Z;
+        printf("FILE: %s, LINE: %d, FUNC: %s, DPL = %x, CPL = %x, RPL = %x, will set CC_SRC = eflags & ~CC_Z\n", __FILE__, __LINE__, __func__, dpl, cpl, rpl);
             return;
         }
     }
@@ -2385,6 +2409,7 @@ void helper_verw(CPUX86State *env, target_ulong selector1)
         }
         if (!(e2 & DESC_W_MASK)) {
         fail:
+            printf("FILE: %s, LINE: %d, FUNC: %s, DPL = %x, CPL = %x, RPL = %x, will set CC_SRC = eflags & ~CC_Z\n", __FILE__, __LINE__, __func__, dpl, cpl, rpl);
             CC_SRC = eflags & ~CC_Z;
             return;
         }
