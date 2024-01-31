@@ -292,15 +292,6 @@ static void do_command_phase(ESPState *s)
     esp_fifo_pop_buf(&s->cmdfifo, buf, cmdlen);
 
     current_lun = scsi_device_find(&s->bus, 0, s->current_dev->id, s->lun);
-    if (!current_lun) {
-        /* No such drive */
-        s->rregs[ESP_RSTAT] = 0;
-        s->rregs[ESP_RINTR] = INTR_DC;
-        s->rregs[ESP_RSEQ] = SEQ_0;
-        esp_raise_irq(s);
-        return;
-    }
-
     s->current_req = scsi_req_new(current_lun, 0, s->lun, buf, cmdlen, s);
     datalen = scsi_req_enqueue(s->current_req);
     s->ti_size = datalen;
@@ -1246,7 +1237,7 @@ static const VMStateDescription vmstate_esp_pdma = {
     .version_id = 0,
     .minimum_version_id = 0,
     .needed = esp_pdma_needed,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_UINT8(pdma_cb, ESPState),
         VMSTATE_END_OF_LIST()
     }
@@ -1257,7 +1248,7 @@ const VMStateDescription vmstate_esp = {
     .version_id = 6,
     .minimum_version_id = 3,
     .post_load = esp_post_load,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_BUFFER(rregs, ESPState),
         VMSTATE_BUFFER(wregs, ESPState),
         VMSTATE_INT32(ti_size, ESPState),
@@ -1286,7 +1277,7 @@ const VMStateDescription vmstate_esp = {
         VMSTATE_UINT8_TEST(lun, ESPState, esp_is_version_6),
         VMSTATE_END_OF_LIST()
     },
-    .subsections = (const VMStateDescription * const []) {
+    .subsections = (const VMStateDescription * []) {
         &vmstate_esp_pdma,
         NULL
     }
@@ -1457,7 +1448,7 @@ static const VMStateDescription vmstate_sysbus_esp_scsi = {
     .version_id = 2,
     .minimum_version_id = 1,
     .pre_save = esp_pre_save,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_UINT8_V(esp.mig_version_id, SysBusESPState, 2),
         VMSTATE_STRUCT(esp, SysBusESPState, 0, vmstate_esp, ESPState),
         VMSTATE_END_OF_LIST()

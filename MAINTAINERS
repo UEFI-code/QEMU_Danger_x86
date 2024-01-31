@@ -70,6 +70,7 @@ R: Daniel P. Berrangé <berrange@redhat.com>
 R: Thomas Huth <thuth@redhat.com>
 R: Markus Armbruster <armbru@redhat.com>
 R: Philippe Mathieu-Daudé <philmd@linaro.org>
+R: Juan Quintela <quintela@redhat.com>
 W: https://www.qemu.org/docs/master/devel/index.html
 S: Odd Fixes
 F: docs/devel/style.rst
@@ -1122,21 +1123,6 @@ L: qemu-arm@nongnu.org
 S: Maintained
 F: hw/arm/olimex-stm32-h405.c
 
-STM32L4x5 SoC Family
-M: Arnaud Minier <arnaud.minier@telecom-paris.fr>
-M: Inès Varhol <ines.varhol@telecom-paris.fr>
-L: qemu-arm@nongnu.org
-S: Maintained
-F: hw/arm/stm32l4x5_soc.c
-F: include/hw/arm/stm32l4x5_soc.h
-
-B-L475E-IOT01A IoT Node
-M: Arnaud Minier <arnaud.minier@telecom-paris.fr>
-M: Inès Varhol <ines.varhol@telecom-paris.fr>
-L: qemu-arm@nongnu.org
-S: Maintained
-F: hw/arm/b-l475e-iot01a.c
-
 SmartFusion2
 M: Subbaraya Sundeep <sundeep.lkml@gmail.com>
 M: Peter Maydell <peter.maydell@linaro.org>
@@ -1867,8 +1853,7 @@ M: Marcel Apfelbaum <marcel.apfelbaum@gmail.com>
 R: Philippe Mathieu-Daudé <philmd@linaro.org>
 R: Yanan Wang <wangyanan55@huawei.com>
 S: Supported
-F: hw/core/cpu-common.c
-F: hw/core/cpu-sysemu.c
+F: hw/core/cpu.c
 F: hw/core/machine-qmp-cmds.c
 F: hw/core/machine.c
 F: hw/core/machine-smp.c
@@ -2182,17 +2167,6 @@ F: hw/vfio/ap.c
 F: docs/system/s390x/vfio-ap.rst
 L: qemu-s390x@nongnu.org
 
-iommufd
-M: Yi Liu <yi.l.liu@intel.com>
-M: Eric Auger <eric.auger@redhat.com>
-M: Zhenzhong Duan <zhenzhong.duan@intel.com>
-S: Supported
-F: backends/iommufd.c
-F: include/sysemu/iommufd.h
-F: include/qemu/chardev_open.h
-F: util/chardev_open.c
-F: docs/devel/vfio-iommufd.rst
-
 vhost
 M: Michael S. Tsirkin <mst@redhat.com>
 S: Supported
@@ -2414,13 +2388,8 @@ F: hw/net/net_tx_pkt*
 Vmware
 M: Dmitry Fleytman <dmitry.fleytman@gmail.com>
 S: Maintained
-F: docs/specs/vmw_pvscsi-spec.txt
-F: hw/display/vmware_vga.c
 F: hw/net/vmxnet*
 F: hw/scsi/vmw_pvscsi*
-F: pc-bios/efi-vmxnet3.rom
-F: pc-bios/vgabios-vmware.bin
-F: roms/config.vga-vmware
 F: tests/qtest/vmxnet3-test.c
 F: docs/specs/vwm_pvscsi-spec.rst
 
@@ -2556,7 +2525,7 @@ F: include/hw/virtio/virtio-gpu.h
 F: docs/system/devices/virtio-gpu.rst
 
 vhost-user-blk
-M: Raphael Norwitz <raphael.s.norwitz@gmail.com>
+M: Raphael Norwitz <raphael.norwitz@nutanix.com>
 S: Maintained
 F: contrib/vhost-user-blk/
 F: contrib/vhost-user-scsi/
@@ -3370,8 +3339,10 @@ S: Odd Fixes
 F: scripts/checkpatch.pl
 
 Migration
+M: Juan Quintela <quintela@redhat.com>
 M: Peter Xu <peterx@redhat.com>
 M: Fabiano Rosas <farosas@suse.de>
+R: Leonardo Bras <leobras@redhat.com>
 S: Maintained
 F: hw/core/vmstate-if.c
 F: include/hw/vmstate-if.h
@@ -3388,8 +3359,10 @@ F: util/userfaultfd.c
 X: migration/rdma*
 
 RDMA Migration
+M: Juan Quintela <quintela@redhat.com>
 R: Li Zhijian <lizhijian@fujitsu.com>
 R: Peter Xu <peterx@redhat.com>
+R: Leonardo Bras <leobras@redhat.com>
 S: Odd Fixes
 F: migration/rdma*
 
@@ -4176,7 +4149,6 @@ F: docs/conf.py
 F: docs/*/conf.py
 F: docs/sphinx/
 F: docs/_templates/
-F: docs/devel/docs.rst
 
 Miscellaneous
 -------------

@@ -234,11 +234,13 @@ bdrv_do_query_node_info(BlockDriverState *bs, BlockNodeInfo *info, Error **errp)
     int ret;
     Error *err = NULL;
 
+    aio_context_acquire(bdrv_get_aio_context(bs));
+
     size = bdrv_getlength(bs);
     if (size < 0) {
         error_setg_errno(errp, -size, "Can't get image size '%s'",
                          bs->exact_filename);
-        return;
+        goto out;
     }
 
     bdrv_refresh_filename(bs);
@@ -263,7 +265,7 @@ bdrv_do_query_node_info(BlockDriverState *bs, BlockNodeInfo *info, Error **errp)
     info->format_specific = bdrv_get_specific_info(bs, &err);
     if (err) {
         error_propagate(errp, err);
-        return;
+        goto out;
     }
     backing_filename = bs->backing_file;
     if (backing_filename[0] != '\0') {
@@ -298,8 +300,11 @@ bdrv_do_query_node_info(BlockDriverState *bs, BlockNodeInfo *info, Error **errp)
         break;
     default:
         error_propagate(errp, err);
-        return;
+        goto out;
     }
+
+out:
+    aio_context_release(bdrv_get_aio_context(bs));
 }
 
 /**
@@ -704,10 +709,15 @@ BlockStatsList *qmp_query_blockstats(bool has_query_nodes,
     /* Just to be safe if query_nodes is not always initialized */
     if (has_query_nodes && query_nodes) {
         for (bs = bdrv_next_node(NULL); bs; bs = bdrv_next_node(bs)) {
+            AioContext *ctx = bdrv_get_aio_context(bs);
+
+            aio_context_acquire(ctx);
             QAPI_LIST_APPEND(tail, bdrv_query_bds_stats(bs, false));
+            aio_context_release(ctx);
         }
     } else {
         for (blk = blk_all_next(NULL); blk; blk = blk_all_next(blk)) {
+            AioContext *ctx = blk_get_aio_context(blk);
             BlockStats *s;
             char *qdev;
 
@@ -715,6 +725,7 @@ BlockStatsList *qmp_query_blockstats(bool has_query_nodes,
                 continue;
             }
 
+            aio_context_acquire(ctx);
             s = bdrv_query_bds_stats(blk_bs(blk), true);
             s->device = g_strdup(blk_name(blk));
 
@@ -726,6 +737,7 @@ BlockStatsList *qmp_query_blockstats(bool has_query_nodes,
             }
 
             bdrv_query_blk_stats(s->stats, blk);
+            aio_context_release(ctx);
 
             QAPI_LIST_APPEND(tail, s);
         }

@@ -34,58 +34,11 @@
 
 /* Hash that stores user set extensions */
 static GHashTable *multi_ext_user_opts;
-static GHashTable *misa_ext_user_opts;
 
 static bool cpu_cfg_ext_is_user_set(uint32_t ext_offset)
 {
     return g_hash_table_contains(multi_ext_user_opts,
                                  GUINT_TO_POINTER(ext_offset));
-}
-
-static bool cpu_misa_ext_is_user_set(uint32_t misa_bit)
-{
-    return g_hash_table_contains(misa_ext_user_opts,
-                                 GUINT_TO_POINTER(misa_bit));
-}
-
-static void cpu_cfg_ext_add_user_opt(uint32_t ext_offset, bool value)
-{
-    g_hash_table_insert(multi_ext_user_opts, GUINT_TO_POINTER(ext_offset),
-                        (gpointer)value);
-}
-
-static void cpu_misa_ext_add_user_opt(uint32_t bit, bool value)
-{
-    g_hash_table_insert(misa_ext_user_opts, GUINT_TO_POINTER(bit),
-                        (gpointer)value);
-}
-
-static void riscv_cpu_write_misa_bit(RISCVCPU *cpu, uint32_t bit,
-                                     bool enabled)
-{
-    CPURISCVState *env = &cpu->env;
-
-    if (enabled) {
-        env->misa_ext |= bit;
-        env->misa_ext_mask |= bit;
-    } else {
-        env->misa_ext &= ~bit;
-        env->misa_ext_mask &= ~bit;
-    }
-}
-
-static const char *cpu_priv_ver_to_str(int priv_ver)
-{
-    switch (priv_ver) {
-    case PRIV_VERSION_1_10_0:
-        return "v1.10.0";
-    case PRIV_VERSION_1_11_0:
-        return "v1.11.0";
-    case PRIV_VERSION_1_12_0:
-        return "v1.12.0";
-    }
-
-    g_assert_not_reached();
 }
 
 static void riscv_cpu_synchronize_from_tb(CPUState *cs,
@@ -159,79 +112,6 @@ static int cpu_cfg_ext_get_min_version(uint32_t ext_offset)
     }
 
     g_assert_not_reached();
-}
-
-static const char *cpu_cfg_ext_get_name(uint32_t ext_offset)
-{
-    const RISCVCPUMultiExtConfig *feat;
-    const RISCVIsaExtData *edata;
-
-    for (edata = isa_edata_arr; edata->name != NULL; edata++) {
-        if (edata->ext_enable_offset == ext_offset) {
-            return edata->name;
-        }
-    }
-
-    for (feat = riscv_cpu_named_features; feat->name != NULL; feat++) {
-        if (feat->offset == ext_offset) {
-            return feat->name;
-        }
-    }
-
-    g_assert_not_reached();
-}
-
-static bool cpu_cfg_offset_is_named_feat(uint32_t ext_offset)
-{
-    const RISCVCPUMultiExtConfig *feat;
-
-    for (feat = riscv_cpu_named_features; feat->name != NULL; feat++) {
-        if (feat->offset == ext_offset) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-static void riscv_cpu_enable_named_feat(RISCVCPU *cpu, uint32_t feat_offset)
-{
-    switch (feat_offset) {
-    case CPU_CFG_OFFSET(zic64b):
-        cpu->cfg.cbom_blocksize = 64;
-        cpu->cfg.cbop_blocksize = 64;
-        cpu->cfg.cboz_blocksize = 64;
-        break;
-    case CPU_CFG_OFFSET(svade):
-        cpu->cfg.ext_svadu = false;
-        break;
-    default:
-        g_assert_not_reached();
-    }
-}
-
-static void cpu_bump_multi_ext_priv_ver(CPURISCVState *env,
-                                        uint32_t ext_offset)
-{
-    int ext_priv_ver;
-
-    if (env->priv_ver == PRIV_VERSION_LATEST) {
-        return;
-    }
-
-    if (cpu_cfg_offset_is_named_feat(ext_offset)) {
-        return;
-    }
-
-    ext_priv_ver = cpu_cfg_ext_get_min_version(ext_offset);
-
-    if (env->priv_ver < ext_priv_ver) {
-        /*
-         * Note: the 'priv_spec' command line option, if present,
-         * will take precedence over this priv_ver bump.
-         */
-        env->priv_ver = ext_priv_ver;
-    }
 }
 
 static void cpu_cfg_ext_auto_update(RISCVCPU *cpu, uint32_t ext_offset,
@@ -393,55 +273,6 @@ static void riscv_cpu_disable_priv_spec_isa_exts(RISCVCPU *cpu)
     }
 }
 
-static void riscv_cpu_update_named_features(RISCVCPU *cpu)
-{
-    cpu->cfg.zic64b = cpu->cfg.cbom_blocksize == 64 &&
-                      cpu->cfg.cbop_blocksize == 64 &&
-                      cpu->cfg.cboz_blocksize == 64;
-
-    cpu->cfg.svade = !cpu->cfg.ext_svadu;
-}
-
-static void riscv_cpu_validate_g(RISCVCPU *cpu)
-{
-    const char *warn_msg = "RVG mandates disabled extension %s";
-    uint32_t g_misa_bits[] = {RVI, RVM, RVA, RVF, RVD};
-    bool send_warn = cpu_misa_ext_is_user_set(RVG);
-
-    for (int i = 0; i < ARRAY_SIZE(g_misa_bits); i++) {
-        uint32_t bit = g_misa_bits[i];
-
-        if (riscv_has_ext(&cpu->env, bit)) {
-            continue;
-        }
-
-        if (!cpu_misa_ext_is_user_set(bit)) {
-            riscv_cpu_write_misa_bit(cpu, bit, true);
-            continue;
-        }
-
-        if (send_warn) {
-            warn_report(warn_msg, riscv_get_misa_ext_name(bit));
-        }
-    }
-
-    if (!cpu->cfg.ext_zicsr) {
-        if (!cpu_cfg_ext_is_user_set(CPU_CFG_OFFSET(ext_zicsr))) {
-            cpu->cfg.ext_zicsr = true;
-        } else if (send_warn) {
-            warn_report(warn_msg, "zicsr");
-        }
-    }
-
-    if (!cpu->cfg.ext_zifencei) {
-        if (!cpu_cfg_ext_is_user_set(CPU_CFG_OFFSET(ext_zifencei))) {
-            cpu->cfg.ext_zifencei = true;
-        } else if (send_warn) {
-            warn_report(warn_msg, "zifencei");
-        }
-    }
-}
-
 /*
  * Check consistency between chosen extensions while setting
  * cpu->cfg accordingly.
@@ -451,8 +282,31 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
     CPURISCVState *env = &cpu->env;
     Error *local_err = NULL;
 
-    if (riscv_has_ext(env, RVG)) {
-        riscv_cpu_validate_g(cpu);
+    /* Do some ISA extension error checking */
+    if (riscv_has_ext(env, RVG) &&
+        !(riscv_has_ext(env, RVI) && riscv_has_ext(env, RVM) &&
+          riscv_has_ext(env, RVA) && riscv_has_ext(env, RVF) &&
+          riscv_has_ext(env, RVD) &&
+          cpu->cfg.ext_zicsr && cpu->cfg.ext_zifencei)) {
+
+        if (cpu_cfg_ext_is_user_set(CPU_CFG_OFFSET(ext_zicsr)) &&
+            !cpu->cfg.ext_zicsr) {
+            error_setg(errp, "RVG requires Zicsr but user set Zicsr to false");
+            return;
+        }
+
+        if (cpu_cfg_ext_is_user_set(CPU_CFG_OFFSET(ext_zifencei)) &&
+            !cpu->cfg.ext_zifencei) {
+            error_setg(errp, "RVG requires Zifencei but user set "
+                       "Zifencei to false");
+            return;
+        }
+
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zicsr), true);
+        cpu_cfg_ext_auto_update(cpu, CPU_CFG_OFFSET(ext_zifencei), true);
+
+        env->misa_ext |= RVI | RVM | RVA | RVF | RVD;
+        env->misa_ext_mask |= RVI | RVM | RVA | RVF | RVD;
     }
 
     if (riscv_has_ext(env, RVI) && riscv_has_ext(env, RVE)) {
@@ -486,11 +340,6 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
 
     if (riscv_has_ext(env, RVF) && !cpu->cfg.ext_zicsr) {
         error_setg(errp, "F extension requires Zicsr");
-        return;
-    }
-
-    if ((cpu->cfg.ext_zacas) && !riscv_has_ext(env, RVA)) {
-        error_setg(errp, "Zacas extension requires A extension");
         return;
     }
 
@@ -771,106 +620,6 @@ void riscv_cpu_validate_set_extensions(RISCVCPU *cpu, Error **errp)
     riscv_cpu_disable_priv_spec_isa_exts(cpu);
 }
 
-#ifndef CONFIG_USER_ONLY
-static bool riscv_cpu_validate_profile_satp(RISCVCPU *cpu,
-                                            RISCVCPUProfile *profile,
-                                            bool send_warn)
-{
-    int satp_max = satp_mode_max_from_map(cpu->cfg.satp_mode.supported);
-
-    if (profile->satp_mode > satp_max) {
-        if (send_warn) {
-            bool is_32bit = riscv_cpu_is_32bit(cpu);
-            const char *req_satp = satp_mode_str(profile->satp_mode, is_32bit);
-            const char *cur_satp = satp_mode_str(satp_max, is_32bit);
-
-            warn_report("Profile %s requires satp mode %s, "
-                        "but satp mode %s was set", profile->name,
-                        req_satp, cur_satp);
-        }
-
-        return false;
-    }
-
-    return true;
-}
-#endif
-
-static void riscv_cpu_validate_profile(RISCVCPU *cpu,
-                                       RISCVCPUProfile *profile)
-{
-    CPURISCVState *env = &cpu->env;
-    const char *warn_msg = "Profile %s mandates disabled extension %s";
-    bool send_warn = profile->user_set && profile->enabled;
-    bool parent_enabled, profile_impl = true;
-    int i;
-
-#ifndef CONFIG_USER_ONLY
-    if (profile->satp_mode != RISCV_PROFILE_ATTR_UNUSED) {
-        profile_impl = riscv_cpu_validate_profile_satp(cpu, profile,
-                                                       send_warn);
-    }
-#endif
-
-    if (profile->priv_spec != RISCV_PROFILE_ATTR_UNUSED &&
-        profile->priv_spec != env->priv_ver) {
-        profile_impl = false;
-
-        if (send_warn) {
-            warn_report("Profile %s requires priv spec %s, "
-                        "but priv ver %s was set", profile->name,
-                        cpu_priv_ver_to_str(profile->priv_spec),
-                        cpu_priv_ver_to_str(env->priv_ver));
-        }
-    }
-
-    for (i = 0; misa_bits[i] != 0; i++) {
-        uint32_t bit = misa_bits[i];
-
-        if (!(profile->misa_ext & bit)) {
-            continue;
-        }
-
-        if (!riscv_has_ext(&cpu->env, bit)) {
-            profile_impl = false;
-
-            if (send_warn) {
-                warn_report(warn_msg, profile->name,
-                            riscv_get_misa_ext_name(bit));
-            }
-        }
-    }
-
-    for (i = 0; profile->ext_offsets[i] != RISCV_PROFILE_EXT_LIST_END; i++) {
-        int ext_offset = profile->ext_offsets[i];
-
-        if (!isa_ext_is_enabled(cpu, ext_offset)) {
-            profile_impl = false;
-
-            if (send_warn) {
-                warn_report(warn_msg, profile->name,
-                            cpu_cfg_ext_get_name(ext_offset));
-            }
-        }
-    }
-
-    profile->enabled = profile_impl;
-
-    if (profile->parent != NULL) {
-        parent_enabled = object_property_get_bool(OBJECT(cpu),
-                                                  profile->parent->name,
-                                                  NULL);
-        profile->enabled = profile->enabled && parent_enabled;
-    }
-}
-
-static void riscv_cpu_validate_profiles(RISCVCPU *cpu)
-{
-    for (int i = 0; riscv_profiles[i] != NULL; i++) {
-        riscv_cpu_validate_profile(cpu, riscv_profiles[i]);
-    }
-}
-
 void riscv_tcg_cpu_finalize_features(RISCVCPU *cpu, Error **errp)
 {
     CPURISCVState *env = &cpu->env;
@@ -887,9 +636,6 @@ void riscv_tcg_cpu_finalize_features(RISCVCPU *cpu, Error **errp)
         error_propagate(errp, local_err);
         return;
     }
-
-    riscv_cpu_update_named_features(cpu);
-    riscv_cpu_validate_profiles(cpu);
 
     if (cpu->cfg.ext_smepmp && !cpu->cfg.pmp) {
         /*
@@ -917,11 +663,6 @@ static bool riscv_cpu_is_generic(Object *cpu_obj)
     return object_dynamic_cast(cpu_obj, TYPE_RISCV_DYNAMIC_CPU) != NULL;
 }
 
-static bool riscv_cpu_is_vendor(Object *cpu_obj)
-{
-    return object_dynamic_cast(cpu_obj, TYPE_RISCV_VENDOR_CPU) != NULL;
-}
-
 /*
  * We'll get here via the following path:
  *
@@ -929,7 +670,7 @@ static bool riscv_cpu_is_vendor(Object *cpu_obj)
  *   -> cpu_exec_realizefn()
  *      -> tcg_cpu_realize() (via accel_cpu_common_realize())
  */
-static bool riscv_tcg_cpu_realize(CPUState *cs, Error **errp)
+static bool tcg_cpu_realize(CPUState *cs, Error **errp)
 {
     RISCVCPU *cpu = RISCV_CPU(cs);
     Error *local_err = NULL;
@@ -990,14 +731,12 @@ static void cpu_set_misa_ext_cfg(Object *obj, Visitor *v, const char *name,
     target_ulong misa_bit = misa_ext_cfg->misa_bit;
     RISCVCPU *cpu = RISCV_CPU(obj);
     CPURISCVState *env = &cpu->env;
-    bool vendor_cpu = riscv_cpu_is_vendor(obj);
+    bool generic_cpu = riscv_cpu_is_generic(obj);
     bool prev_val, value;
 
     if (!visit_type_bool(v, name, &value, errp)) {
         return;
     }
-
-    cpu_misa_ext_add_user_opt(misa_bit, value);
 
     prev_val = env->misa_ext & misa_bit;
 
@@ -1006,23 +745,19 @@ static void cpu_set_misa_ext_cfg(Object *obj, Visitor *v, const char *name,
     }
 
     if (value) {
-        if (vendor_cpu) {
+        if (!generic_cpu) {
             g_autofree char *cpuname = riscv_cpu_get_name(cpu);
             error_setg(errp, "'%s' CPU does not allow enabling extensions",
                        cpuname);
             return;
         }
 
-        if (misa_bit == RVH && env->priv_ver < PRIV_VERSION_1_12_0) {
-            /*
-             * Note: the 'priv_spec' command line option, if present,
-             * will take precedence over this priv_ver bump.
-             */
-            env->priv_ver = PRIV_VERSION_1_12_0;
-        }
+        env->misa_ext |= misa_bit;
+        env->misa_ext_mask |= misa_bit;
+    } else {
+        env->misa_ext &= ~misa_bit;
+        env->misa_ext_mask &= ~misa_bit;
     }
-
-    riscv_cpu_write_misa_bit(cpu, misa_bit, value);
 }
 
 static void cpu_get_misa_ext_cfg(Object *obj, Visitor *v, const char *name,
@@ -1086,116 +821,7 @@ static void riscv_cpu_add_misa_properties(Object *cpu_obj)
                             NULL, (void *)misa_cfg);
         object_property_set_description(cpu_obj, name, desc);
         if (use_def_vals) {
-            riscv_cpu_write_misa_bit(RISCV_CPU(cpu_obj), bit,
-                                     misa_cfg->enabled);
-        }
-    }
-}
-
-static void cpu_set_profile(Object *obj, Visitor *v, const char *name,
-                            void *opaque, Error **errp)
-{
-    RISCVCPUProfile *profile = opaque;
-    RISCVCPU *cpu = RISCV_CPU(obj);
-    bool value;
-    int i, ext_offset;
-
-    if (riscv_cpu_is_vendor(obj)) {
-        error_setg(errp, "Profile %s is not available for vendor CPUs",
-                   profile->name);
-        return;
-    }
-
-    if (cpu->env.misa_mxl != MXL_RV64) {
-        error_setg(errp, "Profile %s only available for 64 bit CPUs",
-                   profile->name);
-        return;
-    }
-
-    if (!visit_type_bool(v, name, &value, errp)) {
-        return;
-    }
-
-    profile->user_set = true;
-    profile->enabled = value;
-
-    if (profile->parent != NULL) {
-        object_property_set_bool(obj, profile->parent->name,
-                                 profile->enabled, NULL);
-    }
-
-    if (profile->enabled) {
-        cpu->env.priv_ver = profile->priv_spec;
-    }
-
-#ifndef CONFIG_USER_ONLY
-    if (profile->satp_mode != RISCV_PROFILE_ATTR_UNUSED) {
-        const char *satp_prop = satp_mode_str(profile->satp_mode,
-                                              riscv_cpu_is_32bit(cpu));
-        object_property_set_bool(obj, satp_prop, profile->enabled, NULL);
-    }
-#endif
-
-    for (i = 0; misa_bits[i] != 0; i++) {
-        uint32_t bit = misa_bits[i];
-
-        if  (!(profile->misa_ext & bit)) {
-            continue;
-        }
-
-        if (bit == RVI && !profile->enabled) {
-            /*
-             * Disabling profiles will not disable the base
-             * ISA RV64I.
-             */
-            continue;
-        }
-
-        cpu_misa_ext_add_user_opt(bit, profile->enabled);
-        riscv_cpu_write_misa_bit(cpu, bit, profile->enabled);
-    }
-
-    for (i = 0; profile->ext_offsets[i] != RISCV_PROFILE_EXT_LIST_END; i++) {
-        ext_offset = profile->ext_offsets[i];
-
-        if (profile->enabled) {
-            if (cpu_cfg_offset_is_named_feat(ext_offset)) {
-                riscv_cpu_enable_named_feat(cpu, ext_offset);
-            }
-
-            cpu_bump_multi_ext_priv_ver(&cpu->env, ext_offset);
-        }
-
-        cpu_cfg_ext_add_user_opt(ext_offset, profile->enabled);
-        isa_ext_update_enabled(cpu, ext_offset, profile->enabled);
-    }
-}
-
-static void cpu_get_profile(Object *obj, Visitor *v, const char *name,
-                            void *opaque, Error **errp)
-{
-    RISCVCPUProfile *profile = opaque;
-    bool value = profile->enabled;
-
-    visit_type_bool(v, name, &value, errp);
-}
-
-static void riscv_cpu_add_profiles(Object *cpu_obj)
-{
-    for (int i = 0; riscv_profiles[i] != NULL; i++) {
-        const RISCVCPUProfile *profile = riscv_profiles[i];
-
-        object_property_add(cpu_obj, profile->name, "bool",
-                            cpu_get_profile, cpu_set_profile,
-                            NULL, (void *)profile);
-
-        /*
-         * CPUs might enable a profile right from the start.
-         * Enable its mandatory extensions right away in this
-         * case.
-         */
-        if (profile->enabled) {
-            object_property_set_bool(cpu_obj, profile->name, true, NULL);
+            object_property_set_bool(cpu_obj, name, misa_cfg->enabled, NULL);
         }
     }
 }
@@ -1224,7 +850,7 @@ static void cpu_set_multi_ext_cfg(Object *obj, Visitor *v, const char *name,
 {
     const RISCVCPUMultiExtConfig *multi_ext_cfg = opaque;
     RISCVCPU *cpu = RISCV_CPU(obj);
-    bool vendor_cpu = riscv_cpu_is_vendor(obj);
+    bool generic_cpu = riscv_cpu_is_generic(obj);
     bool prev_val, value;
 
     if (!visit_type_bool(v, name, &value, errp)) {
@@ -1238,7 +864,9 @@ static void cpu_set_multi_ext_cfg(Object *obj, Visitor *v, const char *name,
                     multi_ext_cfg->name, lower);
     }
 
-    cpu_cfg_ext_add_user_opt(multi_ext_cfg->offset, value);
+    g_hash_table_insert(multi_ext_user_opts,
+                        GUINT_TO_POINTER(multi_ext_cfg->offset),
+                        (gpointer)value);
 
     prev_val = isa_ext_is_enabled(cpu, multi_ext_cfg->offset);
 
@@ -1246,15 +874,11 @@ static void cpu_set_multi_ext_cfg(Object *obj, Visitor *v, const char *name,
         return;
     }
 
-    if (value && vendor_cpu) {
+    if (value && !generic_cpu) {
         g_autofree char *cpuname = riscv_cpu_get_name(cpu);
         error_setg(errp, "'%s' CPU does not allow enabling extensions",
                    cpuname);
         return;
-    }
-
-    if (value) {
-        cpu_bump_multi_ext_priv_ver(&cpu->env, multi_ext_cfg->offset);
     }
 
     isa_ext_update_enabled(cpu, multi_ext_cfg->offset, value);
@@ -1325,8 +949,6 @@ static void riscv_cpu_add_user_properties(Object *obj)
 
     riscv_cpu_add_multiext_prop_array(obj, riscv_cpu_deprecated_exts);
 
-    riscv_cpu_add_profiles(obj);
-
     for (Property *prop = riscv_cpu_options; prop && prop->name; prop++) {
         qdev_property_add_static(DEVICE(obj), prop);
     }
@@ -1372,12 +994,11 @@ static bool riscv_cpu_has_max_extensions(Object *cpu_obj)
     return object_dynamic_cast(cpu_obj, TYPE_RISCV_CPU_MAX) != NULL;
 }
 
-static void riscv_tcg_cpu_instance_init(CPUState *cs)
+static void tcg_cpu_instance_init(CPUState *cs)
 {
     RISCVCPU *cpu = RISCV_CPU(cs);
     Object *obj = OBJECT(cpu);
 
-    misa_ext_user_opts = g_hash_table_new(NULL, g_direct_equal);
     multi_ext_user_opts = g_hash_table_new(NULL, g_direct_equal);
     riscv_cpu_add_user_properties(obj);
 
@@ -1386,7 +1007,7 @@ static void riscv_tcg_cpu_instance_init(CPUState *cs)
     }
 }
 
-static void riscv_tcg_cpu_init_ops(AccelCPUClass *accel_cpu, CPUClass *cc)
+static void tcg_cpu_init_ops(AccelCPUClass *accel_cpu, CPUClass *cc)
 {
     /*
      * All cpus use the same set of operations.
@@ -1394,30 +1015,30 @@ static void riscv_tcg_cpu_init_ops(AccelCPUClass *accel_cpu, CPUClass *cc)
     cc->tcg_ops = &riscv_tcg_ops;
 }
 
-static void riscv_tcg_cpu_class_init(CPUClass *cc)
+static void tcg_cpu_class_init(CPUClass *cc)
 {
-    cc->init_accel_cpu = riscv_tcg_cpu_init_ops;
+    cc->init_accel_cpu = tcg_cpu_init_ops;
 }
 
-static void riscv_tcg_cpu_accel_class_init(ObjectClass *oc, void *data)
+static void tcg_cpu_accel_class_init(ObjectClass *oc, void *data)
 {
     AccelCPUClass *acc = ACCEL_CPU_CLASS(oc);
 
-    acc->cpu_class_init = riscv_tcg_cpu_class_init;
-    acc->cpu_instance_init = riscv_tcg_cpu_instance_init;
-    acc->cpu_target_realize = riscv_tcg_cpu_realize;
+    acc->cpu_class_init = tcg_cpu_class_init;
+    acc->cpu_instance_init = tcg_cpu_instance_init;
+    acc->cpu_target_realize = tcg_cpu_realize;
 }
 
-static const TypeInfo riscv_tcg_cpu_accel_type_info = {
+static const TypeInfo tcg_cpu_accel_type_info = {
     .name = ACCEL_CPU_NAME("tcg"),
 
     .parent = TYPE_ACCEL_CPU,
-    .class_init = riscv_tcg_cpu_accel_class_init,
+    .class_init = tcg_cpu_accel_class_init,
     .abstract = true,
 };
 
-static void riscv_tcg_cpu_accel_register_types(void)
+static void tcg_cpu_accel_register_types(void)
 {
-    type_register_static(&riscv_tcg_cpu_accel_type_info);
+    type_register_static(&tcg_cpu_accel_type_info);
 }
-type_init(riscv_tcg_cpu_accel_register_types);
+type_init(tcg_cpu_accel_register_types);

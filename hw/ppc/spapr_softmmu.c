@@ -334,7 +334,7 @@ static void *hpt_prepare_thread(void *opaque)
         pending->ret = H_NO_MEM;
     }
 
-    bql_lock();
+    qemu_mutex_lock_iothread();
 
     if (SPAPR_MACHINE(qdev_get_machine())->pending_hpt == pending) {
         /* Ready to go */
@@ -344,7 +344,7 @@ static void *hpt_prepare_thread(void *opaque)
         free_pending_hpt(pending);
     }
 
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
     return NULL;
 }
 

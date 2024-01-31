@@ -238,7 +238,7 @@ target_ulong helper_load_dpdes(CPUPPCState *env)
         return dpdes;
     }
 
-    bql_lock();
+    qemu_mutex_lock_iothread();
     THREAD_SIBLING_FOREACH(cs, ccs) {
         PowerPCCPU *ccpu = POWERPC_CPU(ccs);
         CPUPPCState *cenv = &ccpu->env;
@@ -248,7 +248,7 @@ target_ulong helper_load_dpdes(CPUPPCState *env)
             dpdes |= (0x1 << thread_id);
         }
     }
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
 
     return dpdes;
 }
@@ -278,14 +278,14 @@ void helper_store_dpdes(CPUPPCState *env, target_ulong val)
     }
 
     /* Does iothread need to be locked for walking CPU list? */
-    bql_lock();
+    qemu_mutex_lock_iothread();
     THREAD_SIBLING_FOREACH(cs, ccs) {
         PowerPCCPU *ccpu = POWERPC_CPU(ccs);
         uint32_t thread_id = ppc_cpu_tir(ccpu);
 
         ppc_set_irq(cpu, PPC_INTERRUPT_DOORBELL, val & (0x1 << thread_id));
     }
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
 }
 #endif /* defined(TARGET_PPC64) */
 

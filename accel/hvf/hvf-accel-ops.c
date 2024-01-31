@@ -424,10 +424,11 @@ static void *hvf_cpu_thread_fn(void *arg)
 
     rcu_register_thread();
 
-    bql_lock();
+    qemu_mutex_lock_iothread();
     qemu_thread_get_self(cpu->thread);
 
     cpu->thread_id = qemu_get_thread_id();
+    cpu->neg.can_do_io = true;
     current_cpu = cpu;
 
     hvf_init_vcpu(cpu);
@@ -448,7 +449,7 @@ static void *hvf_cpu_thread_fn(void *arg)
 
     hvf_vcpu_destroy(cpu);
     cpu_thread_signal_destroyed(cpu);
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
     rcu_unregister_thread();
     return NULL;
 }

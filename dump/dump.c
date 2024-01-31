@@ -108,11 +108,11 @@ static int dump_cleanup(DumpState *s)
     s->guest_note = NULL;
     if (s->resume) {
         if (s->detached) {
-            bql_lock();
+            qemu_mutex_lock_iothread();
         }
         vm_start();
         if (s->detached) {
-            bql_unlock();
+            qemu_mutex_unlock_iothread();
         }
     }
     migrate_del_blocker(&dump_migration_blocker);

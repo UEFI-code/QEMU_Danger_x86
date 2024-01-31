@@ -399,7 +399,7 @@ nvmm_vcpu_pre_run(CPUState *cpu)
     uint8_t tpr;
     int ret;
 
-    bql_lock();
+    qemu_mutex_lock_iothread();
 
     tpr = cpu_get_apic_tpr(x86_cpu->apic_state);
     if (tpr != qcpu->tpr) {
@@ -462,7 +462,7 @@ nvmm_vcpu_pre_run(CPUState *cpu)
         }
     }
 
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
 }
 
 /*
@@ -485,9 +485,9 @@ nvmm_vcpu_post_run(CPUState *cpu, struct nvmm_vcpu_exit *exit)
     tpr = exit->exitstate.cr8;
     if (qcpu->tpr != tpr) {
         qcpu->tpr = tpr;
-        bql_lock();
+        qemu_mutex_lock_iothread();
         cpu_set_apic_tpr(x86_cpu->apic_state, qcpu->tpr);
-        bql_unlock();
+        qemu_mutex_unlock_iothread();
     }
 }
 
@@ -648,7 +648,7 @@ nvmm_handle_halted(struct nvmm_machine *mach, CPUState *cpu,
     CPUX86State *env = cpu_env(cpu);
     int ret = 0;
 
-    bql_lock();
+    qemu_mutex_lock_iothread();
 
     if (!((cpu->interrupt_request & CPU_INTERRUPT_HARD) &&
           (env->eflags & IF_MASK)) &&
@@ -658,7 +658,7 @@ nvmm_handle_halted(struct nvmm_machine *mach, CPUState *cpu,
         ret = 1;
     }
 
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
 
     return ret;
 }
@@ -721,7 +721,7 @@ nvmm_vcpu_loop(CPUState *cpu)
         return 0;
     }
 
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
     cpu_exec_start(cpu);
 
     /*
@@ -806,16 +806,16 @@ nvmm_vcpu_loop(CPUState *cpu)
             error_report("NVMM: Unexpected VM exit code 0x%lx [hw=0x%lx]",
                 exit->reason, exit->u.inv.hwcode);
             nvmm_get_registers(cpu);
-            bql_lock();
+            qemu_mutex_lock_iothread();
             qemu_system_guest_panicked(cpu_get_crash_info(cpu));
-            bql_unlock();
+            qemu_mutex_unlock_iothread();
             ret = -1;
             break;
         }
     } while (ret == 0);
 
     cpu_exec_end(cpu);
-    bql_lock();
+    qemu_mutex_lock_iothread();
 
     qatomic_set(&cpu->exit_request, false);
 

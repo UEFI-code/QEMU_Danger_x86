@@ -399,17 +399,15 @@ void hmp_info_migrate_parameters(Monitor *mon, const QDict *qdict)
 
 void hmp_loadvm(Monitor *mon, const QDict *qdict)
 {
-    RunState saved_state = runstate_get();
-
+    int saved_vm_running  = runstate_is_running();
     const char *name = qdict_get_str(qdict, "name");
     Error *err = NULL;
 
     vm_stop(RUN_STATE_RESTORE_VM);
 
-    if (load_snapshot(name, NULL, false, NULL, &err)) {
-        load_snapshot_resume(saved_state);
+    if (load_snapshot(name, NULL, false, NULL, &err) && saved_vm_running) {
+        vm_start();
     }
-
     hmp_handle_error(mon, err);
 }
 
@@ -764,7 +762,7 @@ void hmp_migrate(Monitor *mon, const QDict *qdict)
     bool resume = qdict_get_try_bool(qdict, "resume", false);
     const char *uri = qdict_get_str(qdict, "uri");
     Error *err = NULL;
-    g_autoptr(MigrationChannelList) caps = NULL;
+    MigrationChannelList *caps = NULL;
     g_autoptr(MigrationChannel) channel = NULL;
 
     if (inc) {
@@ -788,6 +786,8 @@ void hmp_migrate(Monitor *mon, const QDict *qdict)
     if (hmp_handle_error(mon, err)) {
         return;
     }
+
+    qapi_free_MigrationChannelList(caps);
 
     if (!detach) {
         HMPMigrationStatus *status;
@@ -852,11 +852,14 @@ static void vm_completion(ReadLineState *rs, const char *str)
 
     for (bs = bdrv_first(&it); bs; bs = bdrv_next(&it)) {
         SnapshotInfoList *snapshots, *snapshot;
+        AioContext *ctx = bdrv_get_aio_context(bs);
         bool ok = false;
 
+        aio_context_acquire(ctx);
         if (bdrv_can_snapshot(bs)) {
             ok = bdrv_query_snapshot_info_list(bs, &snapshots, NULL) == 0;
         }
+        aio_context_release(ctx);
         if (!ok) {
             continue;
         }

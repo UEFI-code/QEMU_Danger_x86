@@ -1,9 +1,9 @@
-if 'CONFIG_TCG' not in config_all_accel
+if 'CONFIG_TCG' not in config_all
   subdir_done()
 endif
 # There are namespace pollution issues on Windows, due to osdep.h
 # bringing in Windows headers that define a FLOAT128 type.
-if host_os == 'windows'
+if targetos == 'windows'
   subdir_done()
 endif
 
@@ -124,7 +124,7 @@ test('fp-test-mulAdd', fptest,
      # no fptest_rounding_args
      args: fptest_args +
            ['f16_mulAdd', 'f32_mulAdd', 'f64_mulAdd', 'f128_mulAdd'],
-     suite: ['softfloat-slow', 'softfloat-ops-slow', 'slow'], timeout: 180)
+     suite: ['softfloat-slow', 'softfloat-ops-slow', 'slow'], timeout: 90)
 
 executable(
   'fp-bench',

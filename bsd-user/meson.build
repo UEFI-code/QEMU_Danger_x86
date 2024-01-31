@@ -24,6 +24,6 @@ kvm = cc.find_library('kvm', required: true)
 bsd_user_ss.add(elf, procstat, kvm)
 
 # Pull in the OS-specific build glue, if any
-subdir(host_os)
+subdir(targetos)
 
 specific_ss.add_all(when: 'CONFIG_BSD_USER', if_true: bsd_user_ss)

@@ -92,10 +92,13 @@ static void piix_intx_routing_notifier_xen(PCIDevice *dev)
 {
     int i;
 
-    /* Scan for updates to PCI link routes. */
+    /* Scan for updates to PCI link routes (0x60-0x63). */
     for (i = 0; i < PIIX_NUM_PIRQS; i++) {
-        const PCIINTxRoute route = pci_device_route_intx_to_irq(dev, i);
-        const uint8_t v = route.mode == PCI_INTX_ENABLED ? route.irq : 0;
+        uint8_t v = dev->config_read(dev, PIIX_PIRQCA + i, 1);
+        if (v & 0x80) {
+            v = 0;
+        }
+        v &= 0xf;
         xen_set_pci_link_route(i, v);
     }
 }
@@ -542,24 +545,11 @@ static void pc_i440fx_machine_options(MachineClass *m)
                                      "Use a different south bridge than PIIX3");
 }
 
-static void pc_i440fx_9_0_machine_options(MachineClass *m)
+static void pc_i440fx_8_2_machine_options(MachineClass *m)
 {
     pc_i440fx_machine_options(m);
     m->alias = "pc";
     m->is_default = true;
-}
-
-DEFINE_I440FX_MACHINE(v9_0, "pc-i440fx-9.0", NULL,
-                      pc_i440fx_9_0_machine_options);
-
-static void pc_i440fx_8_2_machine_options(MachineClass *m)
-{
-    pc_i440fx_9_0_machine_options(m);
-    m->alias = NULL;
-    m->is_default = false;
-
-    compat_props_add(m->compat_props, hw_compat_8_2, hw_compat_8_2_len);
-    compat_props_add(m->compat_props, pc_compat_8_2, pc_compat_8_2_len);
 }
 
 DEFINE_I440FX_MACHINE(v8_2, "pc-i440fx-8.2", NULL,
@@ -570,6 +560,8 @@ static void pc_i440fx_8_1_machine_options(MachineClass *m)
     PCMachineClass *pcmc = PC_MACHINE_CLASS(m);
 
     pc_i440fx_8_2_machine_options(m);
+    m->alias = NULL;
+    m->is_default = false;
     pcmc->broken_32bit_mem_addr_check = true;
 
     compat_props_add(m->compat_props, hw_compat_8_1, hw_compat_8_1_len);

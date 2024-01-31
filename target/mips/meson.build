@@ -12,7 +12,7 @@ if have_system
   subdir('sysemu')
 endif
 
-if 'CONFIG_TCG' in config_all_accel
+if 'CONFIG_TCG' in config_all
   subdir('tcg')
 endif
 

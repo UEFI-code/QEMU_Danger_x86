@@ -833,10 +833,8 @@ uint64_t migrate_max_postcopy_bandwidth(void)
 MigMode migrate_mode(void)
 {
     MigrationState *s = migrate_get_current();
-    MigMode mode = s->parameters.mode;
 
-    assert(mode >= 0 && mode < MIG_MODE__MAX);
-    return mode;
+    return s->parameters.mode;
 }
 
 int migrate_multifd_channels(void)

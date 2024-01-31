@@ -25,7 +25,7 @@ static const VMStateDescription vmstate_ehci_sysbus = {
     .name        = "ehci-sysbus",
     .version_id  = 2,
     .minimum_version_id  = 1,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_STRUCT(ehci, EHCISysBusState, 2, vmstate_ehci, EHCIState),
         VMSTATE_END_OF_LIST()
     }

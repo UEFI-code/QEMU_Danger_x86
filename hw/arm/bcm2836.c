@@ -15,8 +15,6 @@
 #include "hw/arm/bcm2836.h"
 #include "hw/arm/raspi_platform.h"
 #include "hw/sysbus.h"
-#include "target/arm/cpu-qom.h"
-#include "target/arm/gtimer.h"
 
 struct BCM283XClass {
     /*< private >*/
@@ -129,16 +127,22 @@ static void bcm2836_realize(DeviceState *dev, Error **errp)
         qdev_get_gpio_in_named(DEVICE(&s->control), "gpu-fiq", 0));
 
     for (n = 0; n < BCM283X_NCPUS; n++) {
-        object_property_set_int(OBJECT(&s->cpu[n].core), "mp-affinity",
-                                (bc->clusterid << 8) | n, &error_abort);
+        /* TODO: this should be converted to a property of ARM_CPU */
+        s->cpu[n].core.mp_affinity = (bc->clusterid << 8) | n;
 
         /* set periphbase/CBAR value for CPU-local registers */
-        object_property_set_int(OBJECT(&s->cpu[n].core), "reset-cbar",
-                                bc->peri_base, &error_abort);
+        if (!object_property_set_int(OBJECT(&s->cpu[n].core), "reset-cbar",
+                                     bc->peri_base, errp)) {
+            return;
+        }
 
         /* start powered off if not enabled */
-        object_property_set_bool(OBJECT(&s->cpu[n].core), "start-powered-off",
-                                 n >= s->enabled_cpus, &error_abort);
+        if (!object_property_set_bool(OBJECT(&s->cpu[n].core),
+                                      "start-powered-off",
+                                      n >= s->enabled_cpus,
+                                      errp)) {
+            return;
+        }
 
         if (!qdev_realize(DEVICE(&s->cpu[n].core), NULL, errp)) {
             return;

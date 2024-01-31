@@ -1923,7 +1923,7 @@ int kvm_arch_handle_exit(CPUState *cs, struct kvm_run *run)
     S390CPU *cpu = S390_CPU(cs);
     int ret = 0;
 
-    bql_lock();
+    qemu_mutex_lock_iothread();
 
     kvm_cpu_synchronize_state(cs);
 
@@ -1947,7 +1947,7 @@ int kvm_arch_handle_exit(CPUState *cs, struct kvm_run *run)
             fprintf(stderr, "Unknown KVM exit: %d\n", run->exit_reason);
             break;
     }
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
 
     if (ret == 0) {
         ret = EXCP_INTERRUPT;

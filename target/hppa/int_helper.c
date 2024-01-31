@@ -84,17 +84,17 @@ void hppa_cpu_alarm_timer(void *opaque)
 void HELPER(write_eirr)(CPUHPPAState *env, target_ulong val)
 {
     env->cr[CR_EIRR] &= ~val;
-    bql_lock();
+    qemu_mutex_lock_iothread();
     eval_interrupt(env_archcpu(env));
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
 }
 
 void HELPER(write_eiem)(CPUHPPAState *env, target_ulong val)
 {
     env->cr[CR_EIEM] = val;
-    bql_lock();
+    qemu_mutex_lock_iothread();
     eval_interrupt(env_archcpu(env));
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
 }
 
 void hppa_cpu_do_interrupt(CPUState *cs)

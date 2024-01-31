@@ -327,9 +327,7 @@ TranslationBlock *tb_gen_code(CPUState *cpu,
 
     gen_code_buf = tcg_ctx->code_gen_ptr;
     tb->tc.ptr = tcg_splitwx_to_rx(gen_code_buf);
-    if (!(cflags & CF_PCREL)) {
-        tb->pc = pc;
-    }
+    tb->pc = pc;
     tb->cs_base = cs_base;
     tb->flags = flags;
     tb->cflags = cflags;
@@ -649,7 +647,7 @@ void cpu_io_recompile(CPUState *cpu, uintptr_t retaddr)
 
 void cpu_interrupt(CPUState *cpu, int mask)
 {
-    g_assert(bql_locked());
+    g_assert(qemu_mutex_iothread_locked());
     cpu->interrupt_request |= mask;
     qatomic_set(&cpu->neg.icount_decr.u16.high, -1);
 }

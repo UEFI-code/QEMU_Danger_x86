@@ -181,6 +181,7 @@ static const char *log_file;
 static bool list_data_dirs;
 static const char *qtest_chrdev;
 static const char *qtest_log;
+static bool opt_one_insn_per_tb;
 
 static int has_defaults = 1;
 static int default_audio = 1;
@@ -2269,7 +2270,8 @@ static void user_register_global_props(void)
 
 static int do_configure_icount(void *opaque, QemuOpts *opts, Error **errp)
 {
-    return !icount_configure(opts, errp);
+    icount_configure(opts, errp);
+    return 0;
 }
 
 static int accelerator_set_property(void *opaque,
@@ -2306,7 +2308,19 @@ static int do_configure_accelerator(void *opaque, QemuOpts *opts, Error **errp)
     qemu_opt_foreach(opts, accelerator_set_property,
                      accel,
                      &error_fatal);
-
+    /*
+     * If legacy -singlestep option is set, honour it for TCG and
+     * silently ignore for any other accelerator (which is how this
+     * option has always behaved).
+     */
+    if (opt_one_insn_per_tb) {
+        /*
+         * This will always succeed for TCG, and we want to ignore
+         * the error from trying to set a nonexistent property
+         * on any other accelerator.
+         */
+        object_property_set_bool(OBJECT(accel), "one-insn-per-tb", true, NULL);
+    }
     ret = accel_init_machine(accel, current_machine);
     if (ret < 0) {
         if (!qtest_with_kvm || ret != -ENOENT) {
@@ -2696,9 +2710,7 @@ void qmp_x_exit_preconfig(Error **errp)
     qemu_machine_creation_done();
 
     if (loadvm) {
-        RunState state = autostart ? RUN_STATE_RUNNING : runstate_get();
         load_snapshot(loadvm, NULL, false, NULL, &error_fatal);
-        load_snapshot_resume(state);
     }
     if (replay_mode != REPLAY_MODE_NONE) {
         replay_vmstate_init();
@@ -3043,6 +3055,9 @@ void qemu_init(int argc, char **argv)
             case QEMU_OPTION_bios:
                 qdict_put_str(machine_opts_dict, "firmware", optarg);
                 break;
+            case QEMU_OPTION_singlestep:
+                opt_one_insn_per_tb = true;
+                break;
             case QEMU_OPTION_S:
                 autostart = 0;
                 break;
@@ -3352,6 +3367,14 @@ void qemu_init(int argc, char **argv)
                 display_remote++;
                 break;
 #endif
+            case QEMU_OPTION_no_acpi:
+                warn_report("-no-acpi is deprecated, use '-machine acpi=off' instead");
+                qdict_put_str(machine_opts_dict, "acpi", "off");
+                break;
+            case QEMU_OPTION_no_hpet:
+                warn_report("-no-hpet is deprecated, use '-machine hpet=off' instead");
+                qdict_put_str(machine_opts_dict, "hpet", "off");
+                break;
             case QEMU_OPTION_no_reboot:
                 olist = qemu_find_opts("action");
                 qemu_opts_parse_noisily(olist, "reboot=shutdown", false);
@@ -3575,9 +3598,20 @@ void qemu_init(int argc, char **argv)
                     exit(1);
                 }
                 break;
+            case QEMU_OPTION_chroot:
+                warn_report("option is deprecated,"
+                            " use '-run-with chroot=...' instead");
+                os_set_chroot(optarg);
+                break;
             case QEMU_OPTION_daemonize:
                 os_set_daemonize(true);
                 break;
+#if defined(CONFIG_LINUX)
+            /* deprecated */
+            case QEMU_OPTION_asyncteardown:
+                init_async_teardown();
+                break;
+#endif
             case QEMU_OPTION_run_with: {
                 const char *str;
                 opts = qemu_opts_parse_noisily(qemu_find_opts("run-with"),
@@ -3703,7 +3737,7 @@ void qemu_init(int argc, char **argv)
     migration_object_init();
 
     /* parse features once if machine provides default cpu_type */
-    current_machine->cpu_type = machine_class_default_cpu_type(machine_class);
+    current_machine->cpu_type = machine_class->default_cpu_type;
     if (cpu_option) {
         current_machine->cpu_type = parse_cpu_option(cpu_option);
     }

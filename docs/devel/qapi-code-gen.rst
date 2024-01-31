@@ -594,7 +594,7 @@ blocking the guest and other background operations.
 Coroutine safety can be hard to prove, similar to thread safety.  Common
 pitfalls are:
 
-- The BQL isn't held across ``qemu_coroutine_yield()``, so
+- The global mutex isn't held across ``qemu_coroutine_yield()``, so
   operations that used to assume that they execute atomically may have
   to be more careful to protect against changes in the global state.
 
@@ -737,8 +737,9 @@ Types, commands, and events share a common namespace.  Therefore,
 generally speaking, type definitions should always use CamelCase for
 user-defined type names, while built-in types are lowercase.
 
-Type names ending with ``List`` are reserved for the generator, which
-uses them for array types.
+Type names ending with ``Kind`` or ``List`` are reserved for the
+generator, which uses them for implicit union enums and array types,
+respectively.
 
 Command names, member names within a type, and feature names should be
 all lower case with words separated by a hyphen.  However, some
@@ -989,8 +990,8 @@ this::
   # @feature: Description text
 
 A tagged section starts with one of the following words:
-"Note:"/"Notes:", "Since:", "Example:"/"Examples:", "Returns:",
-"TODO:".  The section ends with the start of a new section.
+"Note:"/"Notes:", "Since:", "Example"/"Examples", "Returns:", "TODO:".
+The section ends with the start of a new section.
 
 The second and subsequent lines of sections other than
 "Example"/"Examples" should be indented like this::

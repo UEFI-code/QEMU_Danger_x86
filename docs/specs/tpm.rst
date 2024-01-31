@@ -343,9 +343,9 @@ In case an Arm virt machine is emulated, use the following command line:
 
 .. code-block:: console
 
-  qemu-system-aarch64 -machine virt,gic-version=3,acpi=off \
+  qemu-system-aarch64 -machine virt,gic-version=3,accel=kvm \
     -cpu host -m 4G \
-    -nographic -accel kvm \
+    -nographic -no-acpi \
     -chardev socket,id=chrtpm,path=/tmp/mytpm1/swtpm-sock \
     -tpmdev emulator,id=tpm0,chardev=chrtpm \
     -device tpm-tis-device,tpmdev=tpm0 \

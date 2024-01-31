@@ -93,13 +93,13 @@
 
 #define CHECK_NOSHUF_PRED(GET_EA, SIZE, PRED) \
     do { \
-        TCGLabel *noshuf_label = gen_new_label(); \
-        tcg_gen_brcondi_tl(TCG_COND_EQ, PRED, 0, noshuf_label); \
+        TCGLabel *label = gen_new_label(); \
+        tcg_gen_brcondi_tl(TCG_COND_EQ, PRED, 0, label); \
         GET_EA; \
         if (insn->slot == 0 && ctx->pkt->pkt_has_store_s1) { \
             probe_noshuf_load(EA, SIZE, ctx->mem_idx); \
         } \
-        gen_set_label(noshuf_label); \
+        gen_set_label(label); \
         if (insn->slot == 0 && ctx->pkt->pkt_has_store_s1) { \
             process_store(ctx, 1); \
         } \
@@ -462,7 +462,8 @@ static inline TCGv gen_read_ireg(TCGv result, TCGv val, int shift)
 #define fPM_CIRI(REG, IMM, MVAL) \
     do { \
         TCGv tcgv_siV = tcg_constant_tl(siV); \
-        gen_helper_fcircadd(REG, REG, tcgv_siV, MuV, CS); \
+        gen_helper_fcircadd(REG, REG, tcgv_siV, MuV, \
+                            hex_gpr[HEX_REG_CS0 + MuN]); \
     } while (0)
 #else
 #define fEA_IMM(IMM)        do { EA = (IMM); } while (0)

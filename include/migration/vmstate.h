@@ -209,7 +209,7 @@ struct VMStateDescription {
     bool (*dev_unplug_pending)(void *opaque);
 
     const VMStateField *fields;
-    const VMStateDescription * const *subsections;
+    const VMStateDescription **subsections;
 };
 
 extern const VMStateInfo vmstate_info_bool;

@@ -49,19 +49,21 @@ static bool icount_sleep = true;
 /* Arbitrarily pick 1MIPS as the minimum allowable speed.  */
 #define MAX_ICOUNT_SHIFT 10
 
-/* Do not count executed instructions */
-ICountMode use_icount = ICOUNT_DISABLED;
+/*
+ * 0 = Do not count executed instructions.
+ * 1 = Fixed conversion of insn to ns via "shift" option
+ * 2 = Runtime adaptive algorithm to compute shift
+ */
+int use_icount;
 
 static void icount_enable_precise(void)
 {
-    /* Fixed conversion of insn to ns via "shift" option */
-    use_icount = ICOUNT_PRECISE;
+    use_icount = 1;
 }
 
 static void icount_enable_adaptive(void)
 {
-    /* Runtime adaptive algorithm to compute shift */
-    use_icount = ICOUNT_ADAPTATIVE;
+    use_icount = 2;
 }
 
 /*
@@ -254,7 +256,7 @@ static void icount_warp_rt(void)
         int64_t warp_delta;
 
         warp_delta = clock - timers_state.vm_clock_warp_start;
-        if (icount_enabled() == ICOUNT_ADAPTATIVE) {
+        if (icount_enabled() == 2) {
             /*
              * In adaptive mode, do not let QEMU_CLOCK_VIRTUAL run too far
              * ahead of real time (it might already be ahead so careful not
@@ -417,7 +419,7 @@ void icount_account_warp_timer(void)
     icount_warp_rt();
 }
 
-bool icount_configure(QemuOpts *opts, Error **errp)
+void icount_configure(QemuOpts *opts, Error **errp)
 {
     const char *option = qemu_opt_get(opts, "shift");
     bool sleep = qemu_opt_get_bool(opts, "sleep", true);
@@ -427,28 +429,27 @@ bool icount_configure(QemuOpts *opts, Error **errp)
     if (!option) {
         if (qemu_opt_get(opts, "align") != NULL) {
             error_setg(errp, "Please specify shift option when using align");
-            return false;
         }
-        return true;
+        return;
     }
 
     if (align && !sleep) {
         error_setg(errp, "align=on and sleep=off are incompatible");
-        return false;
+        return;
     }
 
     if (strcmp(option, "auto") != 0) {
         if (qemu_strtol(option, NULL, 0, &time_shift) < 0
             || time_shift < 0 || time_shift > MAX_ICOUNT_SHIFT) {
             error_setg(errp, "icount: Invalid shift value");
-            return false;
+            return;
         }
     } else if (icount_align_option) {
         error_setg(errp, "shift=auto and align=on are incompatible");
-        return false;
+        return;
     } else if (!icount_sleep) {
         error_setg(errp, "shift=auto and sleep=off are incompatible");
-        return false;
+        return;
     }
 
     icount_sleep = sleep;
@@ -462,7 +463,7 @@ bool icount_configure(QemuOpts *opts, Error **errp)
     if (time_shift >= 0) {
         timers_state.icount_time_shift = time_shift;
         icount_enable_precise();
-        return true;
+        return;
     }
 
     icount_enable_adaptive();
@@ -490,14 +491,11 @@ bool icount_configure(QemuOpts *opts, Error **errp)
     timer_mod(timers_state.icount_vm_timer,
                    qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) +
                    NANOSECONDS_PER_SECOND / 10);
-    return true;
 }
 
 void icount_notify_exit(void)
 {
-    assert(icount_enabled());
-
-    if (current_cpu) {
+    if (icount_enabled() && current_cpu) {
         qemu_cpu_kick(current_cpu);
         qemu_clock_notify(QEMU_CLOCK_VIRTUAL);
     }

@@ -264,7 +264,7 @@ int getpagesize(void)
     return system_info.dwPageSize;
 }
 
-bool qemu_prealloc_mem(int fd, char *area, size_t sz, int max_threads,
+void qemu_prealloc_mem(int fd, char *area, size_t sz, int max_threads,
                        ThreadContext *tc, Error **errp)
 {
     int i;
@@ -274,8 +274,6 @@ bool qemu_prealloc_mem(int fd, char *area, size_t sz, int max_threads,
     for (i = 0; i < sz / pagesize; i++) {
         memset(area + pagesize * i, 0, 1);
     }
-
-    return true;
 }
 
 char *qemu_get_pid_name(pid_t pid)

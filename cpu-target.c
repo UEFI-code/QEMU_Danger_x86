@@ -24,7 +24,6 @@
 #include "hw/qdev-core.h"
 #include "hw/qdev-properties.h"
 #include "qemu/error-report.h"
-#include "qemu/qemu-print.h"
 #include "migration/vmstate.h"
 #ifdef CONFIG_USER_ONLY
 #include "qemu.h"
@@ -88,7 +87,7 @@ static const VMStateDescription vmstate_cpu_common_exception_index = {
     .version_id = 1,
     .minimum_version_id = 1,
     .needed = cpu_common_exception_index_needed,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_INT32(exception_index, CPUState),
         VMSTATE_END_OF_LIST()
     }
@@ -106,7 +105,7 @@ static const VMStateDescription vmstate_cpu_common_crash_occurred = {
     .version_id = 1,
     .minimum_version_id = 1,
     .needed = cpu_common_crash_occurred_needed,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_BOOL(crash_occurred, CPUState),
         VMSTATE_END_OF_LIST()
     }
@@ -118,12 +117,12 @@ const VMStateDescription vmstate_cpu_common = {
     .minimum_version_id = 1,
     .pre_load = cpu_common_pre_load,
     .post_load = cpu_common_post_load,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_UINT32(halted, CPUState),
         VMSTATE_UINT32(interrupt_request, CPUState),
         VMSTATE_END_OF_LIST()
     },
-    .subsections = (const VMStateDescription * const []) {
+    .subsections = (const VMStateDescription*[]) {
         &vmstate_cpu_common_exception_index,
         &vmstate_cpu_common_crash_occurred,
         NULL
@@ -204,7 +203,6 @@ static Property cpu_common_props[] = {
     DEFINE_PROP_END_OF_LIST(),
 };
 
-#ifndef CONFIG_USER_ONLY
 static bool cpu_get_start_powered_off(Object *obj, Error **errp)
 {
     CPUState *cpu = CPU(obj);
@@ -216,13 +214,12 @@ static void cpu_set_start_powered_off(Object *obj, bool value, Error **errp)
     CPUState *cpu = CPU(obj);
     cpu->start_powered_off = value;
 }
-#endif
 
 void cpu_class_init_props(DeviceClass *dc)
 {
-#ifndef CONFIG_USER_ONLY
     ObjectClass *oc = OBJECT_CLASS(dc);
 
+    device_class_set_props(dc, cpu_common_props);
     /*
      * We can't use DEFINE_PROP_BOOL in the Property array for this
      * property, because we want this to be settable after realize.
@@ -230,9 +227,6 @@ void cpu_class_init_props(DeviceClass *dc)
     object_class_property_add_bool(oc, "start-powered-off",
                                    cpu_get_start_powered_off,
                                    cpu_set_start_powered_off);
-#endif
-
-    device_class_set_props(dc, cpu_common_props);
 }
 
 void cpu_exec_initfn(CPUState *cpu)
@@ -245,21 +239,6 @@ void cpu_exec_initfn(CPUState *cpu)
     cpu->memory = get_system_memory();
     object_ref(OBJECT(cpu->memory));
 #endif
-}
-
-char *cpu_model_from_type(const char *typename)
-{
-    const char *suffix = "-" CPU_RESOLVING_TYPE;
-
-    if (!object_class_by_name(typename)) {
-        return NULL;
-    }
-
-    if (g_str_has_suffix(typename, suffix)) {
-        return g_strndup(typename, strlen(typename) - strlen(suffix));
-    }
-
-    return g_strdup(typename);
 }
 
 const char *parse_cpu_option(const char *cpu_option)
@@ -289,35 +268,42 @@ const char *parse_cpu_option(const char *cpu_option)
     return cpu_type;
 }
 
-#ifndef cpu_list
-static void cpu_list_entry(gpointer data, gpointer user_data)
-{
-    CPUClass *cc = CPU_CLASS(OBJECT_CLASS(data));
-    const char *typename = object_class_get_name(OBJECT_CLASS(data));
-    g_autofree char *model = cpu_model_from_type(typename);
-
-    if (cc->deprecation_note) {
-        qemu_printf("  %s (deprecated)\n", model);
-    } else {
-        qemu_printf("  %s\n", model);
-    }
-}
-
-static void cpu_list(void)
-{
-    GSList *list;
-
-    list = object_class_get_list_sorted(TYPE_CPU, false);
-    qemu_printf("Available CPUs:\n");
-    g_slist_foreach(list, cpu_list_entry, NULL);
-    g_slist_free(list);
-}
-#endif
-
 void list_cpus(void)
 {
+    /* XXX: implement xxx_cpu_list for targets that still miss it */
+#if defined(cpu_list)
     cpu_list();
+#endif
 }
+
+#if defined(CONFIG_USER_ONLY)
+void tb_invalidate_phys_addr(hwaddr addr)
+{
+    mmap_lock();
+    tb_invalidate_phys_page(addr);
+    mmap_unlock();
+}
+#else
+void tb_invalidate_phys_addr(AddressSpace *as, hwaddr addr, MemTxAttrs attrs)
+{
+    ram_addr_t ram_addr;
+    MemoryRegion *mr;
+    hwaddr l = 1;
+
+    if (!tcg_enabled()) {
+        return;
+    }
+
+    RCU_READ_LOCK_GUARD();
+    mr = address_space_translate(as, addr, &addr, &l, false, attrs);
+    if (!(memory_region_is_ram(mr)
+          || memory_region_is_romd(mr))) {
+        return;
+    }
+    ram_addr = memory_region_get_ram_addr(mr) + addr;
+    tb_invalidate_phys_page(ram_addr);
+}
+#endif
 
 /* enable or disable single step mode. EXCP_DEBUG is returned by the
    CPU loop after each instruction */

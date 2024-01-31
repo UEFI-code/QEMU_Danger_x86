@@ -334,30 +334,30 @@ EOF
 }
 
 if check_define __linux__ ; then
-  host_os=linux
+  targetos=linux
 elif check_define _WIN32 ; then
-  host_os=windows
+  targetos=windows
 elif check_define __OpenBSD__ ; then
-  host_os=openbsd
+  targetos=openbsd
 elif check_define __sun__ ; then
-  host_os=sunos
+  targetos=sunos
 elif check_define __HAIKU__ ; then
-  host_os=haiku
+  targetos=haiku
 elif check_define __FreeBSD__ ; then
-  host_os=freebsd
+  targetos=freebsd
 elif check_define __FreeBSD_kernel__ && check_define __GLIBC__; then
-  host_os=gnu/kfreebsd
+  targetos=gnu/kfreebsd
 elif check_define __DragonFly__ ; then
-  host_os=dragonfly
+  targetos=dragonfly
 elif check_define __NetBSD__; then
-  host_os=netbsd
+  targetos=netbsd
 elif check_define __APPLE__; then
-  host_os=darwin
+  targetos=darwin
 else
   # This is a fatal error, but don't report it yet, because we
   # might be going to just print the --help text, or it might
   # be the result of a missing compiler.
-  host_os=bogus
+  targetos=bogus
 fi
 
 if test ! -z "$cpu" ; then
@@ -445,7 +445,6 @@ case "$cpu" in
   loongarch*)
     cpu=loongarch64
     host_arch=loongarch64
-    linux_arch=loongarch
     ;;
 
   mips64*)
@@ -574,13 +573,13 @@ do
     fi
 done
 
-if test "$host_os" = "windows" ; then
+if test "$targetos" = "windows" ; then
   EXESUF=".exe"
 fi
 
 meson_option_build_array() {
   printf '['
-  (if test "$host_os" = windows; then
+  (if test "$targetos" = windows; then
     IFS=\;
   else
     IFS=:
@@ -803,7 +802,7 @@ mak_wilds=""
 
 if [ -n "$host_arch" ] && [ -d "$source_path/common-user/host/$host_arch" ]; then
     if [ "$linux_user" != no ]; then
-        if [ "$host_os" = linux ]; then
+        if [ "$targetos" = linux ]; then
             linux_user=yes
         elif [ "$linux_user" = yes ]; then
             error_exit "linux-user not supported on this architecture"
@@ -814,9 +813,9 @@ if [ -n "$host_arch" ] && [ -d "$source_path/common-user/host/$host_arch" ]; the
     fi
     if [ "$bsd_user" != no ]; then
         if [ "$bsd_user" = "" ]; then
-            test $host_os = freebsd && bsd_user=yes
+            test $targetos = freebsd && bsd_user=yes
         fi
-        if [ "$bsd_user" = yes ] && ! [ -d "$source_path/bsd-user/$host_os" ]; then
+        if [ "$bsd_user" = yes ] && ! [ -d "$source_path/bsd-user/$targetos" ]; then
             error_exit "bsd-user not supported on this host OS"
         fi
         if [ "$bsd_user" = "yes" ]; then
@@ -999,7 +998,7 @@ if test -z "$ninja"; then
     fi
 fi
 
-if test "$host_os" = "bogus"; then
+if test "$targetos" = "bogus"; then
     # Now that we know that we're not printing the help and that
     # the compiler works (so the results of the check_defines we used
     # to identify the OS are reliable), if we didn't recognize the
@@ -1008,7 +1007,7 @@ if test "$host_os" = "bogus"; then
 fi
 
 # test for any invalid configuration combinations
-if test "$host_os" = "windows" && ! has "$dlltool"; then
+if test "$targetos" = "windows" && ! has "$dlltool"; then
   if test "$plugins" = "yes"; then
     error_exit "TCG plugins requires dlltool to build on Windows platforms"
   fi
@@ -1042,7 +1041,7 @@ static THREAD int tls_var;
 int main(void) { return tls_var; }
 EOF
 
-if test "$host_os" = windows || test "$host_os" = haiku; then
+if test "$targetos" = windows || test "$targetos" = haiku; then
   if test "$pie" = "yes"; then
     error_exit "PIE not available due to missing OS support"
   fi
@@ -1232,7 +1231,6 @@ probe_target_compiler() {
   got_cross_cc=no
   container_image=
   container_hosts=
-  container_cross_prefix=
   container_cross_cc=
   container_cross_ar=
   container_cross_as=
@@ -1274,33 +1272,16 @@ probe_target_compiler() {
     test "$container" != no || continue
     test "$host" = "$cpu" || continue
     case $target_arch in
-      # debian-all-test-cross architectures
-
-      hppa|m68k|mips|riscv64|sparc64)
-        container_image=debian-all-test-cross
-        ;;
-      mips64)
-        container_image=debian-all-test-cross
-        container_cross_prefix=mips64-linux-gnuabi64-
-        ;;
-      ppc|ppc64|ppc64le)
-        container_image=debian-all-test-cross
-        container_cross_prefix=powerpc${target_arch#ppc}-linux-gnu-
-        ;;
-
-      # debian-legacy-test-cross architectures (need Debian 11)
-      # - libc6.1-dev-alpha-cross: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1054412
-      # - sh4-linux-user: binaries don't run with bookworm compiler
-
-      alpha|sh4)
-        container_image=debian-legacy-test-cross
-        ;;
-
-      # architectures with individual containers
-
       aarch64)
         # We don't have any bigendian build tools so we only use this for AArch64
         container_image=debian-arm64-cross
+        container_cross_prefix=aarch64-linux-gnu-
+        container_cross_cc=${container_cross_prefix}gcc
+        ;;
+      alpha)
+        container_image=debian-legacy-test-cross
+        container_cross_prefix=alpha-linux-gnu-
+        container_cross_cc=${container_cross_prefix}gcc
         ;;
       arm)
         # We don't have any bigendian build tools so we only use this for ARM
@@ -1309,10 +1290,17 @@ probe_target_compiler() {
         ;;
       cris)
         container_image=fedora-cris-cross
+        container_cross_prefix=cris-linux-gnu-
         ;;
       hexagon)
+        container_image=debian-hexagon-cross
         container_cross_prefix=hexagon-unknown-linux-musl-
         container_cross_cc=${container_cross_prefix}clang
+        ;;
+      hppa)
+        container_image=debian-all-test-cross
+        container_cross_prefix=hppa-linux-gnu-
+        container_cross_cc=${container_cross_prefix}gcc
         ;;
       i386)
         container_image=debian-i686-cross
@@ -1322,12 +1310,51 @@ probe_target_compiler() {
         container_image=debian-loongarch-cross
         container_cross_prefix=loongarch64-unknown-linux-gnu-
         ;;
+      m68k)
+        container_image=debian-all-test-cross
+        container_cross_prefix=m68k-linux-gnu-
+        container_cross_cc=${container_cross_prefix}gcc
+        ;;
       microblaze)
+        container_image=debian-microblaze-cross
         container_cross_prefix=microblaze-linux-musl-
         ;;
       mips64el)
         container_image=debian-mips64el-cross
         container_cross_prefix=mips64el-linux-gnuabi64-
+        ;;
+      mips64)
+        container_image=debian-all-test-cross
+        container_cross_prefix=mips64-linux-gnuabi64-
+        ;;
+      mips)
+        container_image=debian-all-test-cross
+        container_cross_prefix=mips-linux-gnu-
+        ;;
+      nios2)
+        container_image=debian-nios2-cross
+        container_cross_prefix=nios2-linux-gnu-
+        ;;
+      ppc)
+        container_image=debian-all-test-cross
+        container_cross_prefix=powerpc-linux-gnu-
+        container_cross_cc=${container_cross_prefix}gcc
+        ;;
+      ppc64|ppc64le)
+        container_image=debian-all-test-cross
+        container_cross_prefix=powerpc${target_arch#ppc}-linux-gnu-
+        ;;
+      riscv64)
+        container_image=debian-all-test-cross
+        container_cross_prefix=riscv64-linux-gnu-
+        ;;
+      sh4)
+        container_image=debian-legacy-test-cross
+        container_cross_prefix=sh4-linux-gnu-
+        ;;
+      sparc64)
+        container_image=debian-all-test-cross
+        container_cross_prefix=sparc64-linux-gnu-
         ;;
       tricore)
         container_image=debian-tricore-cross
@@ -1335,6 +1362,7 @@ probe_target_compiler() {
         ;;
       x86_64)
         container_image=debian-amd64-cross
+        container_cross_prefix=x86_64-linux-gnu-
         ;;
       xtensa*)
         container_image=debian-xtensa-cross
@@ -1342,10 +1370,12 @@ probe_target_compiler() {
         # default to the dc232b cpu
         container_cross_prefix=/opt/2020.07/xtensa-dc232b-elf/bin/xtensa-dc232b-elf-
         ;;
+      *)
+        # Debian and GNU architecture names usually match
+        container_image=debian-$target_arch-cross
+        container_cross_prefix=$target_arch-linux-gnu-
+        ;;
     esac
-    # Debian and GNU architecture names usually match
-    : ${container_image:=debian-$target_arch-cross}
-    : ${container_cross_prefix:=$target_arch-linux-gnu-}
     : ${container_cross_cc:=${container_cross_prefix}gcc}
     : ${container_cross_ar:=${container_cross_prefix}ar}
     : ${container_cross_as:=${container_cross_prefix}as}
@@ -1529,7 +1559,7 @@ LINKS="$LINKS pc-bios/s390-ccw/Makefile"
 LINKS="$LINKS pc-bios/vof/Makefile"
 LINKS="$LINKS .gdbinit scripts" # scripts needed by relative path in .gdbinit
 LINKS="$LINKS tests/avocado tests/data"
-LINKS="$LINKS tests/qemu-iotests/check tests/qemu-iotests/Makefile"
+LINKS="$LINKS tests/qemu-iotests/check"
 LINKS="$LINKS python"
 LINKS="$LINKS contrib/plugins/Makefile "
 for f in $LINKS ; do
@@ -1542,8 +1572,8 @@ echo "# Automatically generated by configure - do not modify" > Makefile.prereqs
 
 # Mac OS X ships with a broken assembler
 if have_target i386-softmmu x86_64-softmmu && \
-        test "$host_os" != "darwin" && test "$host_os" != "sunos" && \
-        test "$host_os" != "haiku" && \
+        test "$targetos" != "darwin" && test "$targetos" != "sunos" && \
+        test "$targetos" != "haiku" && \
         probe_target_compiler i386-softmmu; then
     subdirs="$subdirs pc-bios/optionrom"
     config_mak=pc-bios/optionrom/config.mak
@@ -1607,7 +1637,7 @@ echo "NINJA=$ninja" >> $config_host_mak
 echo "EXESUF=$EXESUF" >> $config_host_mak
 
 # use included Linux headers for KVM architectures
-if test "$host_os" = "linux" && test -n "$linux_arch"; then
+if test "$targetos" = "linux" && test -n "$linux_arch"; then
   symlink "$source_path/linux-headers/asm-$linux_arch" linux-headers/asm
 fi
 
@@ -1630,20 +1660,21 @@ echo "SRC_PATH=$source_path/contrib/plugins" >> contrib/plugins/$config_host_mak
 echo "PKG_CONFIG=${pkg_config}" >> contrib/plugins/$config_host_mak
 echo "CC=$cc $CPU_CFLAGS" >> contrib/plugins/$config_host_mak
 echo "CFLAGS=${CFLAGS-$default_cflags} $EXTRA_CFLAGS" >> contrib/plugins/$config_host_mak
-if test "$host_os" = windows; then
+if test "$targetos" = windows; then
   echo "DLLTOOL=$dlltool" >> contrib/plugins/$config_host_mak
 fi
-if test "$host_os" = darwin; then
+if test "$targetos" = darwin; then
   echo "CONFIG_DARWIN=y" >> contrib/plugins/$config_host_mak
 fi
-if test "$host_os" = windows; then
+if test "$targetos" = windows; then
   echo "CONFIG_WIN32=y" >> contrib/plugins/$config_host_mak
 fi
 
 # tests/tcg configuration
+(config_host_mak=tests/tcg/config-host.mak
 mkdir -p tests/tcg
-echo "# Automatically generated by configure - do not modify" > tests/tcg/$config_host_mak
-echo "SRC_PATH=$source_path" >> tests/tcg/$config_host_mak
+echo "# Automatically generated by configure - do not modify" > $config_host_mak
+echo "SRC_PATH=$source_path" >> $config_host_mak
 
 tcg_tests_targets=
 for target in $target_list; do
@@ -1686,8 +1717,9 @@ for target in $target_list; do
 done
 
 if test "$tcg" = "enabled"; then
-    echo "TCG_TESTS_TARGETS=$tcg_tests_targets" >> $config_host_mak
+    echo "TCG_TESTS_TARGETS=$tcg_tests_targets" >> config-host.mak
 fi
+)
 
 if test "$skip_meson" = no; then
   cross="config-meson.cross.new"
@@ -1716,7 +1748,7 @@ if test "$skip_meson" = no; then
   echo "# environment defaults, can still be overridden on " >> $cross
   echo "# the command line" >> $cross
   if test -e "$source_path/.git" && \
-      { test "$host_os" = linux || test "$host_os" = "windows"; }; then
+      { test "$targetos" = linux || test "$targetos" = "windows"; }; then
       echo 'werror = true' >> $cross
   fi
   echo "[project options]" >> $cross
@@ -1753,7 +1785,7 @@ if test "$skip_meson" = no; then
   echo "windmc = [$(meson_quote $windmc)]" >> $cross
   if test "$cross_compile" = "yes"; then
     echo "[host_machine]" >> $cross
-    echo "system = '$host_os'" >> $cross
+    echo "system = '$targetos'" >> $cross
     case "$cpu" in
         i386)
             echo "cpu_family = 'x86'" >> $cross
@@ -1779,8 +1811,8 @@ if test "$skip_meson" = no; then
   fi
   mv $cross config-meson.cross
   meson_add_machine_file config-meson.cross
-  if test -f "$source_path/configs/meson/$host_os.txt"; then
-    meson_add_machine_file $source_path/configs/meson/$host_os.txt
+  if test -f "$source_path/configs/meson/$targetos.txt"; then
+    meson_add_machine_file $source_path/configs/meson/$targetos.txt
   fi
 
   rm -rf meson-private meson-info meson-logs

@@ -1,7 +1,7 @@
 plugin_ldflags = []
 # Modules need more symbols than just those in plugins/qemu-plugins.symbols
 if not enable_modules
-  if host_os == 'darwin'
+  if targetos == 'darwin'
     configure_file(
       input: files('qemu-plugins.symbols'),
       output: 'qemu-plugins-ld64.symbols',
@@ -14,7 +14,7 @@ if not enable_modules
 endif
 
 if get_option('plugins')
-  if host_os == 'windows'
+  if targetos == 'windows'
     dlltool = find_program('dlltool', required: true)
 
     # Generate a .lib file for plugins to link against.

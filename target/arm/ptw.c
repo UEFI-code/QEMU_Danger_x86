@@ -95,10 +95,7 @@ static const uint8_t pamax_map[] = {
     [6] = 52,
 };
 
-/*
- * The cpu-specific constant value of PAMax; also used by hw/arm/virt.
- * Note that machvirt_init calls this on a CPU that is inited but not realized!
- */
+/* The cpu-specific constant value of PAMax; also used by hw/arm/virt. */
 unsigned int arm_pamax(ARMCPU *cpu)
 {
     if (arm_feature(&cpu->env, ARM_FEATURE_AARCH64)) {
@@ -113,8 +110,13 @@ unsigned int arm_pamax(ARMCPU *cpu)
         return pamax_map[parange];
     }
 
-    if (arm_feature(&cpu->env, ARM_FEATURE_LPAE)) {
-        /* v7 or v8 with LPAE */
+    /*
+     * In machvirt_init, we call arm_pamax on a cpu that is not fully
+     * initialized, so we can't rely on the propagation done in realize.
+     */
+    if (arm_feature(&cpu->env, ARM_FEATURE_LPAE) ||
+        arm_feature(&cpu->env, ARM_FEATURE_V7VE)) {
+        /* v7 with LPAE */
         return 40;
     }
     /* Anything else */
@@ -770,9 +772,9 @@ static uint64_t arm_casq_ptw(CPUARMState *env, uint64_t old_val,
 #if !TCG_OVERSIZED_GUEST
 # error "Unexpected configuration"
 #endif
-    bool locked = bql_locked();
+    bool locked = qemu_mutex_iothread_locked();
     if (!locked) {
-        bql_lock();
+       qemu_mutex_lock_iothread();
     }
     if (ptw->out_be) {
         cur_val = ldq_be_p(host);
@@ -786,7 +788,7 @@ static uint64_t arm_casq_ptw(CPUARMState *env, uint64_t old_val,
         }
     }
     if (!locked) {
-        bql_unlock();
+        qemu_mutex_unlock_iothread();
     }
 #endif
 
@@ -1579,12 +1581,6 @@ static bool lpae_block_desc_valid(ARMCPU *cpu, bool ds,
     }
 }
 
-static bool nv_nv1_enabled(CPUARMState *env, S1Translate *ptw)
-{
-    uint64_t hcr = arm_hcr_el2_eff_secstate(env, ptw->in_space);
-    return (hcr & (HCR_NV | HCR_NV1)) == (HCR_NV | HCR_NV1);
-}
-
 /**
  * get_phys_addr_lpae: perform one stage of page table walk, LPAE format
  *
@@ -1993,21 +1989,6 @@ static bool get_phys_addr_lpae(CPUARMState *env, S1Translate *ptw,
         xn = extract64(attrs, 54, 1);
         pxn = extract64(attrs, 53, 1);
 
-        if (el == 1 && nv_nv1_enabled(env, ptw)) {
-            /*
-             * With FEAT_NV, when HCR_EL2.{NV,NV1} == {1,1}, the block/page
-             * descriptor bit 54 holds PXN, 53 is RES0, and the effective value
-             * of UXN is 0. Similarly for bits 59 and 60 in table descriptors
-             * (which we have already folded into bits 53 and 54 of attrs).
-             * AP[1] (descriptor bit 6, our ap bit 0) is treated as 0.
-             * Similarly, APTable[0] from the table descriptor is treated as 0;
-             * we already folded this into AP[1] and squashing that to 0 does
-             * the right thing.
-             */
-            pxn = xn;
-            xn = 0;
-            ap &= ~1;
-        }
         /*
          * Note that we modified ptw->in_space earlier for NSTable, but
          * result->f.attrs retains a copy of the original security space.

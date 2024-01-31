@@ -355,9 +355,9 @@ static void *edu_fact_thread(void *opaque)
         smp_mb__after_rmw();
 
         if (qatomic_read(&edu->status) & EDU_STATUS_IRQFACT) {
-            bql_lock();
+            qemu_mutex_lock_iothread();
             edu_raise_irq(edu, FACT_IRQ);
-            bql_unlock();
+            qemu_mutex_unlock_iothread();
         }
     }
 

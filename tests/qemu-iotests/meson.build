@@ -1,4 +1,4 @@
-if not have_tools or host_os == 'windows'
+if not have_tools or targetos == 'windows'
   subdir_done()
 endif
 

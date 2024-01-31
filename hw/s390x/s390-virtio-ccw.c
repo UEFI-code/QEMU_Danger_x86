@@ -399,7 +399,7 @@ static int s390_machine_protect(S390CcwMachineState *ms)
     }
 
     /* Set SE header and unpack */
-    rc = s390_ipl_prepare_pv_header(&local_err);
+    rc = s390_ipl_prepare_pv_header();
     if (rc) {
         goto out_err;
     }
@@ -418,9 +418,6 @@ static int s390_machine_protect(S390CcwMachineState *ms)
     return rc;
 
 out_err:
-    if (local_err) {
-        error_report_err(local_err);
-    }
     s390_machine_unprotect(ms);
     return rc;
 }
@@ -866,26 +863,14 @@ bool css_migration_enabled(void)
     }                                                                         \
     type_init(ccw_machine_register_##suffix)
 
-static void ccw_machine_9_0_instance_options(MachineState *machine)
-{
-}
-
-static void ccw_machine_9_0_class_options(MachineClass *mc)
-{
-}
-DEFINE_CCW_MACHINE(9_0, "9.0", true);
-
 static void ccw_machine_8_2_instance_options(MachineState *machine)
 {
-    ccw_machine_9_0_instance_options(machine);
 }
 
 static void ccw_machine_8_2_class_options(MachineClass *mc)
 {
-    ccw_machine_9_0_class_options(mc);
-    compat_props_add(mc->compat_props, hw_compat_8_2, hw_compat_8_2_len);
 }
-DEFINE_CCW_MACHINE(8_2, "8.2", false);
+DEFINE_CCW_MACHINE(8_2, "8.2", true);
 
 static void ccw_machine_8_1_instance_options(MachineState *machine)
 {

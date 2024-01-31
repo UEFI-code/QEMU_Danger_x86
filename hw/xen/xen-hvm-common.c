@@ -623,7 +623,7 @@ void xen_hvm_change_state_handler(void *opaque, bool running,
 
     xen_set_ioreq_server_state(xen_domid,
                                state->ioservid,
-                               running);
+                               (rstate == RUN_STATE_RUNNING));
 }
 
 void xen_exit_notifier(Notifier *n, void *data)

@@ -18,7 +18,6 @@
 #
 # Creator/Owner: Kevin Wolf <kwolf@redhat.com>
 
-import asyncio
 import iotests
 
 iotests.script_initialize(supported_fmts=['qcow2'],
@@ -70,6 +69,6 @@ with iotests.FilePath('disk1.img') as base1_path, \
                 # The test is done once both jobs are gone
                 if finished == 2:
                     break
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass
         vm.cmd('query-jobs')

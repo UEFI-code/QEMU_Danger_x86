@@ -1353,7 +1353,9 @@ static void n8x0_init(MachineState *machine,
     n8x0_spi_setup(s);
     n8x0_dss_setup(s);
     n8x0_cbus_setup(s);
-    n8x0_usb_setup(s);
+    if (machine_usb(machine)) {
+        n8x0_usb_setup(s);
+    }
 
     if (machine->kernel_filename) {
         /* Or at the linux loader.  */

@@ -9,7 +9,6 @@
 #include "hw/sysbus.h"
 #include "hw/intc/loongarch_ipi.h"
 #include "hw/irq.h"
-#include "hw/qdev-properties.h"
 #include "qapi/error.h"
 #include "qemu/log.h"
 #include "exec/address-spaces.h"
@@ -18,16 +17,14 @@
 #include "target/loongarch/internals.h"
 #include "trace.h"
 
-static MemTxResult loongarch_ipi_readl(void *opaque, hwaddr addr,
-                                       uint64_t *data,
-                                       unsigned size, MemTxAttrs attrs)
+static void loongarch_ipi_writel(void *, hwaddr, uint64_t, unsigned);
+
+static uint64_t loongarch_ipi_readl(void *opaque, hwaddr addr, unsigned size)
 {
-    IPICore *s;
-    LoongArchIPI *ipi = opaque;
+    IPICore *s = opaque;
     uint64_t ret = 0;
     int index = 0;
 
-    s = &ipi->cpu[attrs.requester_id];
     addr &= 0xff;
     switch (addr) {
     case CORE_STATUS_OFF:
@@ -52,12 +49,10 @@ static MemTxResult loongarch_ipi_readl(void *opaque, hwaddr addr,
     }
 
     trace_loongarch_ipi_read(size, (uint64_t)addr, ret);
-    *data = ret;
-    return MEMTX_OK;
+    return ret;
 }
 
-static void send_ipi_data(CPULoongArchState *env, uint64_t val, hwaddr addr,
-                          MemTxAttrs attrs)
+static void send_ipi_data(CPULoongArchState *env, uint64_t val, hwaddr addr)
 {
     int i, mask = 0, data = 0;
 
@@ -66,8 +61,8 @@ static void send_ipi_data(CPULoongArchState *env, uint64_t val, hwaddr addr,
      * if the mask is 0, we need not to do anything.
      */
     if ((val >> 27) & 0xf) {
-        data = address_space_ldl(env->address_space_iocsr, addr,
-                                 attrs, NULL);
+        data = address_space_ldl(&env->address_space_iocsr, addr,
+                                 MEMTXATTRS_UNSPECIFIED, NULL);
         for (i = 0; i < 4; i++) {
             /* get mask for byte writing */
             if (val & (0x1 << (27 + i))) {
@@ -78,8 +73,8 @@ static void send_ipi_data(CPULoongArchState *env, uint64_t val, hwaddr addr,
 
     data &= mask;
     data |= (val >> 32) & ~mask;
-    address_space_stl(env->address_space_iocsr, addr,
-                      data, attrs, NULL);
+    address_space_stl(&env->address_space_iocsr, addr,
+                      data, MEMTXATTRS_UNSPECIFIED, NULL);
 }
 
 static int archid_cmp(const void *a, const void *b)
@@ -108,72 +103,80 @@ static CPUState *ipi_getcpu(int arch_id)
     CPUArchId *archid;
 
     archid = find_cpu_by_archid(machine, arch_id);
-    if (archid) {
-        return CPU(archid->cpu);
-    }
-
-    return NULL;
+    return CPU(archid->cpu);
 }
 
-static MemTxResult mail_send(uint64_t val, MemTxAttrs attrs)
+static void ipi_send(uint64_t val)
+{
+    uint32_t cpuid;
+    uint8_t vector;
+    CPUState *cs;
+    LoongArchCPU *cpu;
+    LoongArchIPI *s;
+
+    cpuid = extract32(val, 16, 10);
+    if (cpuid >= LOONGARCH_MAX_CPUS) {
+        trace_loongarch_ipi_unsupported_cpuid("IOCSR_IPI_SEND", cpuid);
+        return;
+    }
+
+    /* IPI status vector */
+    vector = extract8(val, 0, 5);
+
+    cs = ipi_getcpu(cpuid);
+    cpu = LOONGARCH_CPU(cs);
+    s = LOONGARCH_IPI(cpu->env.ipistate);
+    loongarch_ipi_writel(&s->ipi_core, CORE_SET_OFF, BIT(vector), 4);
+}
+
+static void mail_send(uint64_t val)
 {
     uint32_t cpuid;
     hwaddr addr;
+    CPULoongArchState *env;
     CPUState *cs;
+    LoongArchCPU *cpu;
 
     cpuid = extract32(val, 16, 10);
     if (cpuid >= LOONGARCH_MAX_CPUS) {
         trace_loongarch_ipi_unsupported_cpuid("IOCSR_MAIL_SEND", cpuid);
-        return MEMTX_DECODE_ERROR;
+        return;
     }
 
+    addr = 0x1020 + (val & 0x1c);
     cs = ipi_getcpu(cpuid);
-    if (cs == NULL) {
-        return MEMTX_DECODE_ERROR;
-    }
-
-    /* override requester_id */
-    addr = SMP_IPI_MAILBOX + CORE_BUF_20 + (val & 0x1c);
-    attrs.requester_id = cs->cpu_index;
-    send_ipi_data(&LOONGARCH_CPU(cs)->env, val, addr, attrs);
-    return MEMTX_OK;
+    cpu = LOONGARCH_CPU(cs);
+    env = &cpu->env;
+    send_ipi_data(env, val, addr);
 }
 
-static MemTxResult any_send(uint64_t val, MemTxAttrs attrs)
+static void any_send(uint64_t val)
 {
     uint32_t cpuid;
     hwaddr addr;
+    CPULoongArchState *env;
     CPUState *cs;
+    LoongArchCPU *cpu;
 
     cpuid = extract32(val, 16, 10);
     if (cpuid >= LOONGARCH_MAX_CPUS) {
         trace_loongarch_ipi_unsupported_cpuid("IOCSR_ANY_SEND", cpuid);
-        return MEMTX_DECODE_ERROR;
+        return;
     }
 
-    cs = ipi_getcpu(cpuid);
-    if (cs == NULL) {
-        return MEMTX_DECODE_ERROR;
-    }
-
-    /* override requester_id */
     addr = val & 0xffff;
-    attrs.requester_id = cs->cpu_index;
-    send_ipi_data(&LOONGARCH_CPU(cs)->env, val, addr, attrs);
-    return MEMTX_OK;
+    cs = ipi_getcpu(cpuid);
+    cpu = LOONGARCH_CPU(cs);
+    env = &cpu->env;
+    send_ipi_data(env, val, addr);
 }
 
-static MemTxResult loongarch_ipi_writel(void *opaque, hwaddr addr, uint64_t val,
-                                        unsigned size, MemTxAttrs attrs)
+static void loongarch_ipi_writel(void *opaque, hwaddr addr, uint64_t val,
+                                 unsigned size)
 {
-    LoongArchIPI *ipi = opaque;
-    IPICore *s;
+    IPICore *s = opaque;
     int index = 0;
-    uint32_t cpuid;
-    uint8_t vector;
-    CPUState *cs;
 
-    s = &ipi->cpu[attrs.requester_id];
     addr &= 0xff;
     trace_loongarch_ipi_write(size, (uint64_t)addr, val);
     switch (addr) {
@@ -200,34 +203,17 @@ static MemTxResult loongarch_ipi_writel(void *opaque, hwaddr addr, uint64_t val,
         s->buf[index] = val;
         break;
     case IOCSR_IPI_SEND:
-        cpuid = extract32(val, 16, 10);
-        if (cpuid >= LOONGARCH_MAX_CPUS) {
-            trace_loongarch_ipi_unsupported_cpuid("IOCSR_IPI_SEND", cpuid);
-            return MEMTX_DECODE_ERROR;
-        }
-
-        /* IPI status vector */
-        vector = extract8(val, 0, 5);
-        cs = ipi_getcpu(cpuid);
-        if (cs == NULL) {
-            return MEMTX_DECODE_ERROR;
-        }
-
-        /* override requester_id */
-        attrs.requester_id = cs->cpu_index;
-        loongarch_ipi_writel(ipi, CORE_SET_OFF, BIT(vector), 4, attrs);
+        ipi_send(val);
         break;
     default:
         qemu_log_mask(LOG_UNIMP, "invalid write: %x", (uint32_t)addr);
         break;
     }
-
-    return MEMTX_OK;
 }
 
 static const MemoryRegionOps loongarch_ipi_ops = {
-    .read_with_attrs = loongarch_ipi_readl,
-    .write_with_attrs = loongarch_ipi_writel,
+    .read = loongarch_ipi_readl,
+    .write = loongarch_ipi_writel,
     .impl.min_access_size = 4,
     .impl.max_access_size = 4,
     .valid.min_access_size = 4,
@@ -236,28 +222,24 @@ static const MemoryRegionOps loongarch_ipi_ops = {
 };
 
 /* mail send and any send only support writeq */
-static MemTxResult loongarch_ipi_writeq(void *opaque, hwaddr addr, uint64_t val,
-                                        unsigned size, MemTxAttrs attrs)
+static void loongarch_ipi_writeq(void *opaque, hwaddr addr, uint64_t val,
+                                 unsigned size)
 {
-    MemTxResult ret = MEMTX_OK;
-
     addr &= 0xfff;
     switch (addr) {
     case MAIL_SEND_OFFSET:
-        ret = mail_send(val, attrs);
+        mail_send(val);
         break;
     case ANY_SEND_OFFSET:
-        ret = any_send(val, attrs);
+        any_send(val);
         break;
     default:
        break;
     }
-
-    return ret;
 }
 
 static const MemoryRegionOps loongarch_ipi64_ops = {
-    .write_with_attrs = loongarch_ipi_writeq,
+    .write = loongarch_ipi_writeq,
     .impl.min_access_size = 8,
     .impl.max_access_size = 8,
     .valid.min_access_size = 8,
@@ -265,46 +247,30 @@ static const MemoryRegionOps loongarch_ipi64_ops = {
     .endianness = DEVICE_LITTLE_ENDIAN,
 };
 
-static void loongarch_ipi_realize(DeviceState *dev, Error **errp)
+static void loongarch_ipi_init(Object *obj)
 {
-    LoongArchIPI *s = LOONGARCH_IPI(dev);
-    SysBusDevice *sbd = SYS_BUS_DEVICE(dev);
-    int i;
+    LoongArchIPI *s = LOONGARCH_IPI(obj);
+    SysBusDevice *sbd = SYS_BUS_DEVICE(obj);
 
-    if (s->num_cpu == 0) {
-        error_setg(errp, "num-cpu must be at least 1");
-        return;
-    }
-
-    memory_region_init_io(&s->ipi_iocsr_mem, OBJECT(dev), &loongarch_ipi_ops,
-                          s, "loongarch_ipi_iocsr", 0x48);
+    memory_region_init_io(&s->ipi_iocsr_mem, obj, &loongarch_ipi_ops,
+                          &s->ipi_core, "loongarch_ipi_iocsr", 0x48);
 
     /* loongarch_ipi_iocsr performs re-entrant IO through ipi_send */
     s->ipi_iocsr_mem.disable_reentrancy_guard = true;
 
     sysbus_init_mmio(sbd, &s->ipi_iocsr_mem);
 
-    memory_region_init_io(&s->ipi64_iocsr_mem, OBJECT(dev),
-                          &loongarch_ipi64_ops,
-                          s, "loongarch_ipi64_iocsr", 0x118);
+    memory_region_init_io(&s->ipi64_iocsr_mem, obj, &loongarch_ipi64_ops,
+                          &s->ipi_core, "loongarch_ipi64_iocsr", 0x118);
     sysbus_init_mmio(sbd, &s->ipi64_iocsr_mem);
-
-    s->cpu = g_new0(IPICore, s->num_cpu);
-    if (s->cpu == NULL) {
-        error_setg(errp, "Memory allocation for ExtIOICore faile");
-        return;
-    }
-
-    for (i = 0; i < s->num_cpu; i++) {
-        qdev_init_gpio_out(dev, &s->cpu[i].irq, 1);
-    }
+    qdev_init_gpio_out(DEVICE(obj), &s->ipi_core.irq, 1);
 }
 
 static const VMStateDescription vmstate_ipi_core = {
     .name = "ipi-single",
     .version_id = 2,
     .minimum_version_id = 2,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_UINT32(status, IPICore),
         VMSTATE_UINT32(en, IPICore),
         VMSTATE_UINT32(set, IPICore),
@@ -316,42 +282,27 @@ static const VMStateDescription vmstate_ipi_core = {
 
 static const VMStateDescription vmstate_loongarch_ipi = {
     .name = TYPE_LOONGARCH_IPI,
-    .version_id = 2,
-    .minimum_version_id = 2,
-    .fields = (const VMStateField[]) {
-        VMSTATE_STRUCT_VARRAY_POINTER_UINT32(cpu, LoongArchIPI, num_cpu,
-                         vmstate_ipi_core, IPICore),
+    .version_id = 1,
+    .minimum_version_id = 1,
+    .fields = (VMStateField[]) {
+        VMSTATE_STRUCT(ipi_core, LoongArchIPI, 0, vmstate_ipi_core, IPICore),
         VMSTATE_END_OF_LIST()
     }
-};
-
-static Property ipi_properties[] = {
-    DEFINE_PROP_UINT32("num-cpu", LoongArchIPI, num_cpu, 1),
-    DEFINE_PROP_END_OF_LIST(),
 };
 
 static void loongarch_ipi_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
 
-    dc->realize = loongarch_ipi_realize;
-    device_class_set_props(dc, ipi_properties);
     dc->vmsd = &vmstate_loongarch_ipi;
-}
-
-static void loongarch_ipi_finalize(Object *obj)
-{
-    LoongArchIPI *s = LOONGARCH_IPI(obj);
-
-    g_free(s->cpu);
 }
 
 static const TypeInfo loongarch_ipi_info = {
     .name          = TYPE_LOONGARCH_IPI,
     .parent        = TYPE_SYS_BUS_DEVICE,
     .instance_size = sizeof(LoongArchIPI),
+    .instance_init = loongarch_ipi_init,
     .class_init    = loongarch_ipi_class_init,
-    .instance_finalize = loongarch_ipi_finalize,
 };
 
 static void loongarch_ipi_register_types(void)

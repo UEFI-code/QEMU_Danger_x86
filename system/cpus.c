@@ -65,8 +65,7 @@
 
 #endif /* CONFIG_LINUX */
 
-/* The Big QEMU Lock (BQL) */
-static QemuMutex bql;
+static QemuMutex qemu_global_mutex;
 
 /*
  * The chosen accelerator is supposed to register this.
@@ -260,33 +259,14 @@ void cpu_interrupt(CPUState *cpu, int mask)
     }
 }
 
-/*
- * True if the vm was previously suspended, and has not been woken or reset.
- */
-static int vm_was_suspended;
-
-void vm_set_suspended(bool suspended)
-{
-    vm_was_suspended = suspended;
-}
-
-bool vm_get_suspended(void)
-{
-    return vm_was_suspended;
-}
-
 static int do_vm_stop(RunState state, bool send_stop)
 {
     int ret = 0;
-    RunState oldstate = runstate_get();
 
-    if (runstate_is_live(oldstate)) {
-        vm_was_suspended = (oldstate == RUN_STATE_SUSPENDED);
+    if (runstate_is_running()) {
         runstate_set(state);
         cpu_disable_ticks();
-        if (oldstate == RUN_STATE_RUNNING) {
-            pause_all_vcpus();
-        }
+        pause_all_vcpus();
         vm_state_notify(0, state);
         if (send_stop) {
             qapi_event_send_stop();
@@ -409,14 +389,14 @@ void qemu_init_cpu_loop(void)
     qemu_init_sigbus();
     qemu_cond_init(&qemu_cpu_cond);
     qemu_cond_init(&qemu_pause_cond);
-    qemu_mutex_init(&bql);
+    qemu_mutex_init(&qemu_global_mutex);
 
     qemu_thread_get_self(&io_thread);
 }
 
 void run_on_cpu(CPUState *cpu, run_on_cpu_func func, run_on_cpu_data data)
 {
-    do_run_on_cpu(cpu, func, data, &bql);
+    do_run_on_cpu(cpu, func, data, &qemu_global_mutex);
 }
 
 static void qemu_cpu_stop(CPUState *cpu, bool exit)
@@ -448,7 +428,7 @@ void qemu_wait_io_event(CPUState *cpu)
             slept = true;
             qemu_plugin_vcpu_idle_cb(cpu);
         }
-        qemu_cond_wait(cpu->halt_cond, &bql);
+        qemu_cond_wait(cpu->halt_cond, &qemu_global_mutex);
     }
     if (slept) {
         qemu_plugin_vcpu_resume_cb(cpu);
@@ -501,46 +481,46 @@ bool qemu_in_vcpu_thread(void)
     return current_cpu && qemu_cpu_is_self(current_cpu);
 }
 
-QEMU_DEFINE_STATIC_CO_TLS(bool, bql_locked)
+QEMU_DEFINE_STATIC_CO_TLS(bool, iothread_locked)
 
-bool bql_locked(void)
+bool qemu_mutex_iothread_locked(void)
 {
-    return get_bql_locked();
+    return get_iothread_locked();
 }
 
 bool qemu_in_main_thread(void)
 {
-    return bql_locked();
+    return qemu_mutex_iothread_locked();
 }
 
 /*
  * The BQL is taken from so many places that it is worth profiling the
  * callers directly, instead of funneling them all through a single function.
  */
-void bql_lock_impl(const char *file, int line)
+void qemu_mutex_lock_iothread_impl(const char *file, int line)
 {
-    QemuMutexLockFunc bql_lock_fn = qatomic_read(&bql_mutex_lock_func);
+    QemuMutexLockFunc bql_lock = qatomic_read(&qemu_bql_mutex_lock_func);
 
-    g_assert(!bql_locked());
-    bql_lock_fn(&bql, file, line);
-    set_bql_locked(true);
+    g_assert(!qemu_mutex_iothread_locked());
+    bql_lock(&qemu_global_mutex, file, line);
+    set_iothread_locked(true);
 }
 
-void bql_unlock(void)
+void qemu_mutex_unlock_iothread(void)
 {
-    g_assert(bql_locked());
-    set_bql_locked(false);
-    qemu_mutex_unlock(&bql);
+    g_assert(qemu_mutex_iothread_locked());
+    set_iothread_locked(false);
+    qemu_mutex_unlock(&qemu_global_mutex);
 }
 
-void qemu_cond_wait_bql(QemuCond *cond)
+void qemu_cond_wait_iothread(QemuCond *cond)
 {
-    qemu_cond_wait(cond, &bql);
+    qemu_cond_wait(cond, &qemu_global_mutex);
 }
 
-void qemu_cond_timedwait_bql(QemuCond *cond, int ms)
+void qemu_cond_timedwait_iothread(QemuCond *cond, int ms)
 {
-    qemu_cond_timedwait(cond, &bql, ms);
+    qemu_cond_timedwait(cond, &qemu_global_mutex, ms);
 }
 
 /* signal CPU creation */
@@ -591,15 +571,15 @@ void pause_all_vcpus(void)
     replay_mutex_unlock();
 
     while (!all_vcpus_paused()) {
-        qemu_cond_wait(&qemu_pause_cond, &bql);
+        qemu_cond_wait(&qemu_pause_cond, &qemu_global_mutex);
         CPU_FOREACH(cpu) {
             qemu_cpu_kick(cpu);
         }
     }
 
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
     replay_mutex_lock();
-    bql_lock();
+    qemu_mutex_lock_iothread();
 }
 
 void cpu_resume(CPUState *cpu)
@@ -628,9 +608,9 @@ void cpu_remove_sync(CPUState *cpu)
     cpu->stop = true;
     cpu->unplug = true;
     qemu_cpu_kick(cpu);
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
     qemu_thread_join(cpu->thread);
-    bql_lock();
+    qemu_mutex_lock_iothread();
 }
 
 void cpus_register_accel(const AccelOpsClass *ops)
@@ -669,7 +649,7 @@ void qemu_init_vcpu(CPUState *cpu)
     cpus_accel->create_vcpu_thread(cpu);
 
     while (!cpu->created) {
-        qemu_cond_wait(&qemu_cpu_cond, &bql);
+        qemu_cond_wait(&qemu_cpu_cond, &qemu_global_mutex);
     }
 }
 
@@ -699,13 +679,11 @@ int vm_stop(RunState state)
 
 /**
  * Prepare for (re)starting the VM.
- * Returns 0 if the vCPUs should be restarted, -1 on an error condition,
- * and 1 otherwise.
+ * Returns -1 if the vCPUs are not to be restarted (e.g. if they are already
+ * running or in case of an error condition), 0 otherwise.
  */
 int vm_prepare_start(bool step_pending)
 {
-    int ret = vm_was_suspended ? 1 : 0;
-    RunState state = vm_was_suspended ? RUN_STATE_SUSPENDED : RUN_STATE_RUNNING;
     RunState requested;
 
     qemu_vmstop_requested(&requested);
@@ -736,10 +714,9 @@ int vm_prepare_start(bool step_pending)
     qapi_event_send_resume();
 
     cpu_enable_ticks();
-    runstate_set(state);
-    vm_state_notify(1, state);
-    vm_was_suspended = false;
-    return ret;
+    runstate_set(RUN_STATE_RUNNING);
+    vm_state_notify(1, RUN_STATE_RUNNING);
+    return 0;
 }
 
 void vm_start(void)
@@ -749,20 +726,11 @@ void vm_start(void)
     }
 }
 
-void vm_resume(RunState state)
-{
-    if (runstate_is_live(state)) {
-        vm_start();
-    } else {
-        runstate_set(state);
-    }
-}
-
 /* does a state transition even if the VM is already stopped,
    current state is forgotten forever */
 int vm_stop_force_state(RunState state)
 {
-    if (runstate_is_live(runstate_get())) {
+    if (runstate_is_running()) {
         return vm_stop(state);
     } else {
         int ret;

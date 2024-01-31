@@ -104,7 +104,6 @@ typedef enum X86CPUIDFeature {
     X86_FEAT_AVX2,
     X86_FEAT_BMI1,
     X86_FEAT_BMI2,
-    X86_FEAT_CMPCCXADD,
     X86_FEAT_F16C,
     X86_FEAT_FMA,
     X86_FEAT_MOVBE,
@@ -159,27 +158,15 @@ typedef enum X86InsnCheck {
 typedef enum X86InsnSpecial {
     X86_SPECIAL_None,
 
-    /* Accepts LOCK prefix; LOCKed operations do not load or writeback operand 0 */
-    X86_SPECIAL_HasLock,
-
     /* Always locked if it has a memory operand (XCHG) */
     X86_SPECIAL_Locked,
 
     /*
-     * Rd/Mb or Rd/Mw in the manual: register operand 0 is treated as 32 bits
-     * (and writeback zero-extends it to 64 bits if applicable).  PREFIX_DATA
-     * does not trigger 16-bit writeback and, as a side effect, high-byte
-     * registers are never used.
+     * Register operand 0/2 is zero extended to 32 bits.  Rd/Mb or Rd/Mw
+     * in the manual.
      */
-    X86_SPECIAL_Op0_Rd,
-
-    /*
-     * Ry/Mb in the manual (PINSRB).  However, the high bits are never used by
-     * the instruction in either the register or memory cases; the *real* effect
-     * of this modifier is that high-byte registers are never used, even without
-     * a REX prefix.  Therefore, PINSRW does not need it despite having Ry/Mw.
-     */
-    X86_SPECIAL_Op2_Ry,
+    X86_SPECIAL_ZExtOp0,
+    X86_SPECIAL_ZExtOp2,
 
     /*
      * Register operand 2 is extended to full width, while a memory operand
@@ -192,10 +179,6 @@ typedef enum X86InsnSpecial {
      * become P/P/Q/N, and size "x" becomes "q".
      */
     X86_SPECIAL_MMX,
-
-    /* When loaded into s->T0, register operand 1 is zero/sign extended.  */
-    X86_SPECIAL_SExtT0,
-    X86_SPECIAL_ZExtT0,
 } X86InsnSpecial;
 
 /*
@@ -283,10 +266,6 @@ struct X86DecodedInsn {
     X86DecodedOp op[3];
     target_ulong immediate;
     AddressParts mem;
-
-    TCGv cc_dst, cc_src, cc_src2;
-    TCGv_i32 cc_op_dynamic;
-    int8_t cc_op;
 
     uint8_t b;
 };

@@ -26,7 +26,6 @@
 #include "sysemu/sysemu.h"
 #include "qemu/error-report.h"
 #include "qemu/module.h"
-#include "target/arm/cpu-qom.h"
 
 #define NAME_SIZE 20
 

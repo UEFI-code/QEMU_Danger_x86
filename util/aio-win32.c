@@ -438,6 +438,7 @@ void aio_context_set_poll_params(AioContext *ctx, int64_t max_ns,
     }
 }
 
-void aio_context_set_aio_params(AioContext *ctx, int64_t max_batch)
+void aio_context_set_aio_params(AioContext *ctx, int64_t max_batch,
+                                Error **errp)
 {
 }

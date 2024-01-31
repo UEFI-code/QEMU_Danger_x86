@@ -7,12 +7,8 @@
 typedef void IOEventHandler(void *opaque, QEMUChrEvent event);
 typedef int BackendChangeHandler(void *opaque);
 
-/**
- * struct CharBackend - back end as seen by front end
- * @fe_is_open: the front end is ready for IO
- *
- * The actual backend is Chardev
- */
+/* This is the backend as seen by frontend, the actual backend is
+ * Chardev */
 struct CharBackend {
     Chardev *chr;
     IOEventHandler *chr_event;
@@ -21,7 +17,7 @@ struct CharBackend {
     BackendChangeHandler *chr_be_change;
     void *opaque;
     int tag;
-    bool fe_is_open;
+    int fe_open;
 };
 
 /**
@@ -160,13 +156,12 @@ void qemu_chr_fe_set_echo(CharBackend *be, bool echo);
 
 /**
  * qemu_chr_fe_set_open:
- * @be: a CharBackend
- * @is_open: the front end open status
  *
- * This is an indication that the front end is ready (or not) to begin
- * doing I/O. Without associated Chardev, do nothing.
+ * Set character frontend open status.  This is an indication that the
+ * front end is ready (or not) to begin doing I/O.
+ * Without associated Chardev, do nothing.
  */
-void qemu_chr_fe_set_open(CharBackend *be, bool is_open);
+void qemu_chr_fe_set_open(CharBackend *be, int fe_open);
 
 /**
  * qemu_chr_fe_printf:

@@ -228,20 +228,20 @@ static int multifd_recv_initial_packet(QIOChannel *c, Error **errp)
     }
 
     if (msg.id > migrate_multifd_channels()) {
-        error_setg(errp, "multifd: received channel id %u is greater than "
-                   "number of channels %u", msg.id, migrate_multifd_channels());
+        error_setg(errp, "multifd: received channel version %u "
+                   "expected %u", msg.version, MULTIFD_VERSION);
         return -1;
     }
 
     return msg.id;
 }
 
-static MultiFDPages_t *multifd_pages_init(uint32_t n)
+static MultiFDPages_t *multifd_pages_init(size_t size)
 {
     MultiFDPages_t *pages = g_new0(MultiFDPages_t, 1);
 
-    pages->allocated = n;
-    pages->offset = g_new0(ram_addr_t, n);
+    pages->allocated = size;
+    pages->offset = g_new0(ram_addr_t, size);
 
     return pages;
 }
@@ -250,6 +250,7 @@ static void multifd_pages_clear(MultiFDPages_t *pages)
 {
     pages->num = 0;
     pages->allocated = 0;
+    pages->packet_num = 0;
     pages->block = NULL;
     g_free(pages->offset);
     pages->offset = NULL;
@@ -390,7 +391,7 @@ struct {
  * false.
  */
 
-static int multifd_send_pages(void)
+static int multifd_send_pages(QEMUFile *f)
 {
     int i;
     static int next_channel;
@@ -436,7 +437,7 @@ static int multifd_send_pages(void)
     return 1;
 }
 
-int multifd_queue_page(RAMBlock *block, ram_addr_t offset)
+int multifd_queue_page(QEMUFile *f, RAMBlock *block, ram_addr_t offset)
 {
     MultiFDPages_t *pages = multifd_send_state->pages;
     bool changed = false;
@@ -456,12 +457,12 @@ int multifd_queue_page(RAMBlock *block, ram_addr_t offset)
         changed = true;
     }
 
-    if (multifd_send_pages() < 0) {
+    if (multifd_send_pages(f) < 0) {
         return -1;
     }
 
     if (changed) {
-        return multifd_queue_page(block, offset);
+        return multifd_queue_page(f, block, offset);
     }
 
     return 1;
@@ -583,7 +584,7 @@ static int multifd_zero_copy_flush(QIOChannel *c)
     return ret;
 }
 
-int multifd_send_sync_main(void)
+int multifd_send_sync_main(QEMUFile *f)
 {
     int i;
     bool flush_zero_copy;
@@ -592,7 +593,7 @@ int multifd_send_sync_main(void)
         return 0;
     }
     if (multifd_send_state->pages->num) {
-        if (multifd_send_pages() < 0) {
+        if (multifd_send_pages(f) < 0) {
             error_report("%s: multifd_send_pages fail", __func__);
             return -1;
         }
@@ -786,7 +787,6 @@ static void multifd_tls_outgoing_handshake(QIOTask *task,
 
     trace_multifd_tls_outgoing_handshake_error(ioc, error_get_pretty(err));
 
-    migrate_set_error(migrate_get_current(), err);
     /*
      * Error happen, mark multifd_send_thread status as 'quit' although it
      * is not created, and then tell who pay attention to me.
@@ -794,7 +794,6 @@ static void multifd_tls_outgoing_handshake(QIOTask *task,
     p->quit = true;
     qemu_sem_post(&multifd_send_state->channels_ready);
     qemu_sem_post(&p->sem_sync);
-    error_free(err);
 }
 
 static void *multifd_tls_handshake_thread(void *opaque)
@@ -848,13 +847,14 @@ static bool multifd_channel_connect(MultiFDSendParams *p,
          * so we mustn't call multifd_send_thread until then
          */
         return multifd_tls_channel_connect(p, ioc, errp);
-    }
 
-    migration_ioc_register_yank(ioc);
-    p->registered_yank = true;
-    p->c = ioc;
-    qemu_thread_create(&p->thread, p->name, multifd_send_thread, p,
-                       QEMU_THREAD_JOINABLE);
+    } else {
+        migration_ioc_register_yank(ioc);
+        p->registered_yank = true;
+        p->c = ioc;
+        qemu_thread_create(&p->thread, p->name, multifd_send_thread, p,
+                           QEMU_THREAD_JOINABLE);
+    }
     return true;
 }
 
@@ -950,10 +950,12 @@ int multifd_save_setup(Error **errp)
 
     for (i = 0; i < thread_count; i++) {
         MultiFDSendParams *p = &multifd_send_state->params[i];
+        Error *local_err = NULL;
         int ret;
 
-        ret = multifd_send_state->ops->send_setup(p, errp);
+        ret = multifd_send_state->ops->send_setup(p, &local_err);
         if (ret) {
+            error_propagate(errp, local_err);
             return ret;
         }
     }
@@ -1192,10 +1194,12 @@ int multifd_load_setup(Error **errp)
 
     for (i = 0; i < thread_count; i++) {
         MultiFDRecvParams *p = &multifd_recv_state->params[i];
+        Error *local_err = NULL;
         int ret;
 
-        ret = multifd_recv_state->ops->recv_setup(p, errp);
+        ret = multifd_recv_state->ops->recv_setup(p, &local_err);
         if (ret) {
+            error_propagate(errp, local_err);
             return ret;
         }
     }

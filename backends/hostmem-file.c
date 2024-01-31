@@ -36,25 +36,24 @@ struct HostMemoryBackendFile {
     OnOffAuto rom;
 };
 
-static bool
+static void
 file_backend_memory_alloc(HostMemoryBackend *backend, Error **errp)
 {
 #ifndef CONFIG_POSIX
     error_setg(errp, "backend '%s' not supported on this host",
                object_get_typename(OBJECT(backend)));
-    return false;
 #else
     HostMemoryBackendFile *fb = MEMORY_BACKEND_FILE(backend);
-    g_autofree gchar *name = NULL;
     uint32_t ram_flags;
+    gchar *name;
 
     if (!backend->size) {
         error_setg(errp, "can't create backend with size 0");
-        return false;
+        return;
     }
     if (!fb->mem_path) {
         error_setg(errp, "mem-path property not set");
-        return false;
+        return;
     }
 
     switch (fb->rom) {
@@ -66,18 +65,18 @@ file_backend_memory_alloc(HostMemoryBackend *backend, Error **errp)
         if (!fb->readonly) {
             error_setg(errp, "property 'rom' = 'on' is not supported with"
                        " 'readonly' = 'off'");
-            return false;
+            return;
         }
         break;
     case ON_OFF_AUTO_OFF:
         if (fb->readonly && backend->share) {
             error_setg(errp, "property 'rom' = 'off' is incompatible with"
                        " 'readonly' = 'on' and 'share' = 'on'");
-            return false;
+            return;
         }
         break;
     default:
-        g_assert_not_reached();
+        assert(false);
     }
 
     name = host_memory_backend_get_name(backend);
@@ -87,9 +86,10 @@ file_backend_memory_alloc(HostMemoryBackend *backend, Error **errp)
     ram_flags |= backend->reserve ? 0 : RAM_NORESERVE;
     ram_flags |= fb->is_pmem ? RAM_PMEM : 0;
     ram_flags |= RAM_NAMED_FILE;
-    return memory_region_init_ram_from_file(&backend->mr, OBJECT(backend), name,
-                                            backend->size, fb->align, ram_flags,
-                                            fb->mem_path, fb->offset, errp);
+    memory_region_init_ram_from_file(&backend->mr, OBJECT(backend), name,
+                                     backend->size, fb->align, ram_flags,
+                                     fb->mem_path, fb->offset, errp);
+    g_free(name);
 #endif
 }
 

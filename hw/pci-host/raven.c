@@ -345,10 +345,8 @@ static void raven_realize(PCIDevice *d, Error **errp)
     d->config[PCI_LATENCY_TIMER] = 0x10;
     d->config[PCI_CAPABILITY_LIST] = 0x00;
 
-    if (!memory_region_init_rom_nomigrate(&s->bios, OBJECT(s), "bios",
-                                          BIOS_SIZE, errp)) {
-        return;
-    }
+    memory_region_init_rom_nomigrate(&s->bios, OBJECT(s), "bios", BIOS_SIZE,
+                                     &error_fatal);
     memory_region_add_subregion(get_system_memory(), (uint32_t)(-BIOS_SIZE),
                                 &s->bios);
     if (s->bios_name) {
@@ -385,7 +383,7 @@ static const VMStateDescription vmstate_raven = {
     .name = "raven",
     .version_id = 0,
     .minimum_version_id = 0,
-    .fields = (const VMStateField[]) {
+    .fields = (VMStateField[]) {
         VMSTATE_PCI_DEVICE(dev, RavenPCIState),
         VMSTATE_END_OF_LIST()
     },

@@ -1250,9 +1250,10 @@ static int ram_save_page(RAMState *rs, PageSearchStatus *pss)
     return pages;
 }
 
-static int ram_save_multifd_page(RAMBlock *block, ram_addr_t offset)
+static int ram_save_multifd_page(QEMUFile *file, RAMBlock *block,
+                                 ram_addr_t offset)
 {
-    if (multifd_queue_page(block, offset) < 0) {
+    if (multifd_queue_page(file, block, offset) < 0) {
         return -1;
     }
     stat64_add(&mig_stats.normal_pages, 1);
@@ -1335,7 +1336,7 @@ static int find_dirty_block(RAMState *rs, PageSearchStatus *pss)
             if (migrate_multifd() &&
                 !migrate_multifd_flush_after_each_section()) {
                 QEMUFile *f = rs->pss[RAM_CHANNEL_PRECOPY].pss_channel;
-                int ret = multifd_send_sync_main();
+                int ret = multifd_send_sync_main(f);
                 if (ret < 0) {
                     return ret;
                 }
@@ -2066,7 +2067,7 @@ static int ram_save_target_page_legacy(RAMState *rs, PageSearchStatus *pss)
      * still see partially copied pages which is data corruption.
      */
     if (migrate_multifd() && !migration_in_postcopy()) {
-        return ram_save_multifd_page(block, offset);
+        return ram_save_multifd_page(pss->pss_channel, block, offset);
     }
 
     return ram_save_page(rs, pss);
@@ -2394,7 +2395,7 @@ static void ram_save_cleanup(void *opaque)
 
     /* We don't use dirty log with background snapshots */
     if (!migrate_background_snapshot()) {
-        /* caller have hold BQL or is in a bh, so there is
+        /* caller have hold iothread lock or is in a bh, so there is
          * no writing race against the migration bitmap
          */
         if (global_dirty_tracking & GLOBAL_DIRTY_MIGRATION) {
@@ -2983,9 +2984,9 @@ static int ram_save_setup(QEMUFile *f, void *opaque)
     migration_ops = g_malloc0(sizeof(MigrationOps));
     migration_ops->ram_save_target_page = ram_save_target_page_legacy;
 
-    bql_unlock();
-    ret = multifd_send_sync_main();
-    bql_lock();
+    qemu_mutex_unlock_iothread();
+    ret = multifd_send_sync_main(f);
+    qemu_mutex_lock_iothread();
     if (ret < 0) {
         return ret;
     }
@@ -3108,7 +3109,7 @@ out:
     if (ret >= 0
         && migration_is_setup_or_active(migrate_get_current()->state)) {
         if (migrate_multifd() && migrate_multifd_flush_after_each_section()) {
-            ret = multifd_send_sync_main();
+            ret = multifd_send_sync_main(rs->pss[RAM_CHANNEL_PRECOPY].pss_channel);
             if (ret < 0) {
                 return ret;
             }
@@ -3130,7 +3131,7 @@ out:
  *
  * Returns zero to indicate success or negative on error
  *
- * Called with the BQL
+ * Called with iothread lock
  *
  * @f: QEMUFile where to send the data
  * @opaque: RAMState pointer
@@ -3182,7 +3183,7 @@ static int ram_save_complete(QEMUFile *f, void *opaque)
         }
     }
 
-    ret = multifd_send_sync_main();
+    ret = multifd_send_sync_main(rs->pss[RAM_CHANNEL_PRECOPY].pss_channel);
     if (ret < 0) {
         return ret;
     }
@@ -3213,19 +3214,20 @@ static void ram_state_pending_estimate(void *opaque, uint64_t *must_precopy,
 static void ram_state_pending_exact(void *opaque, uint64_t *must_precopy,
                                     uint64_t *can_postcopy)
 {
+    MigrationState *s = migrate_get_current();
     RAMState **temp = opaque;
     RAMState *rs = *temp;
-    uint64_t remaining_size;
 
-    if (!migration_in_postcopy()) {
-        bql_lock();
+    uint64_t remaining_size = rs->migration_dirty_pages * TARGET_PAGE_SIZE;
+
+    if (!migration_in_postcopy() && remaining_size < s->threshold_size) {
+        qemu_mutex_lock_iothread();
         WITH_RCU_READ_LOCK_GUARD() {
             migration_bitmap_sync_precopy(rs, false);
         }
-        bql_unlock();
+        qemu_mutex_unlock_iothread();
+        remaining_size = rs->migration_dirty_pages * TARGET_PAGE_SIZE;
     }
-
-    remaining_size = rs->migration_dirty_pages * TARGET_PAGE_SIZE;
 
     if (migrate_postcopy_ram()) {
         /* We can do postcopy, and all the data is postcopiable */
@@ -3451,7 +3453,7 @@ void colo_incoming_start_dirty_log(void)
 {
     RAMBlock *block = NULL;
     /* For memory_global_dirty_log_start below. */
-    bql_lock();
+    qemu_mutex_lock_iothread();
     qemu_mutex_lock_ramlist();
 
     memory_global_dirty_log_sync(false);
@@ -3465,7 +3467,7 @@ void colo_incoming_start_dirty_log(void)
     }
     ram_state->migration_dirty_pages = 0;
     qemu_mutex_unlock_ramlist();
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
 }
 
 /* It is need to hold the global lock to call this helper */

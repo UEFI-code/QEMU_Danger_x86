@@ -45,9 +45,9 @@ void hyperv_x86_synic_update(X86CPU *cpu)
 
 static void async_synic_update(CPUState *cs, run_on_cpu_data data)
 {
-    bql_lock();
+    qemu_mutex_lock_iothread();
     hyperv_x86_synic_update(X86_CPU(cs));
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
 }
 
 int kvm_hv_handle_exit(X86CPU *cpu, struct kvm_hyperv_exit *exit)

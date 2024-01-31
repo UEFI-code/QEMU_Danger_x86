@@ -955,7 +955,7 @@ void ppce500_init(MachineState *machine)
          * when implementing non-kernel boot.
          */
         object_property_set_bool(OBJECT(cs), "start-powered-off", i != 0,
-                                 &error_abort);
+                                 &error_fatal);
         qdev_realize_and_unref(DEVICE(cs), NULL, &error_fatal);
 
         if (!firstenv) {

@@ -400,7 +400,7 @@ static int vfu_object_mr_rw(MemoryRegion *mr, uint8_t *buf, hwaddr offset,
         }
 
         if (release_lock) {
-            bql_unlock();
+            qemu_mutex_unlock_iothread();
             release_lock = false;
         }
 

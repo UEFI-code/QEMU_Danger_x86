@@ -299,7 +299,7 @@ COREAUDIO_WRAPPER_FUNC(write, size_t, (HWVoiceOut *hw, void *buf, size_t size),
 #undef COREAUDIO_WRAPPER_FUNC
 
 /*
- * callback to feed audiooutput buffer. called without BQL.
+ * callback to feed audiooutput buffer. called without iothread lock.
  * allowed to lock "buf_mutex", but disallowed to have any other locks.
  */
 static OSStatus audioDeviceIOProc(
@@ -538,7 +538,7 @@ static void update_device_playback_state(coreaudioVoiceOut *core)
     }
 }
 
-/* called without BQL. */
+/* called without iothread lock. */
 static OSStatus handle_voice_change(
     AudioObjectID in_object_id,
     UInt32 in_number_addresses,
@@ -547,7 +547,7 @@ static OSStatus handle_voice_change(
 {
     coreaudioVoiceOut *core = in_client_data;
 
-    bql_lock();
+    qemu_mutex_lock_iothread();
 
     if (core->outputDeviceID) {
         fini_out_device(core);
@@ -557,7 +557,7 @@ static OSStatus handle_voice_change(
         update_device_playback_state(core);
     }
 
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
     return 0;
 }
 

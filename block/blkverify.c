@@ -151,10 +151,10 @@ static void blkverify_close(BlockDriverState *bs)
 {
     BDRVBlkverifyState *s = bs->opaque;
 
-    bdrv_graph_wrlock();
+    bdrv_graph_wrlock(NULL);
     bdrv_unref_child(bs, s->test_file);
     s->test_file = NULL;
-    bdrv_graph_wrunlock();
+    bdrv_graph_wrunlock(NULL);
 }
 
 static int64_t coroutine_fn GRAPH_RDLOCK

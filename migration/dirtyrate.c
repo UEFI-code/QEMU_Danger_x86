@@ -90,13 +90,13 @@ static int64_t do_calculate_dirtyrate(DirtyPageRecord dirty_pages,
 
 void global_dirty_log_change(unsigned int flag, bool start)
 {
-    bql_lock();
+    qemu_mutex_lock_iothread();
     if (start) {
         memory_global_dirty_log_start(flag);
     } else {
         memory_global_dirty_log_stop(flag);
     }
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
 }
 
 /*
@@ -106,12 +106,12 @@ void global_dirty_log_change(unsigned int flag, bool start)
  */
 static void global_dirty_log_sync(unsigned int flag, bool one_shot)
 {
-    bql_lock();
+    qemu_mutex_lock_iothread();
     memory_global_dirty_log_sync(false);
     if (one_shot) {
         memory_global_dirty_log_stop(flag);
     }
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
 }
 
 static DirtyPageRecord *vcpu_dirty_stat_alloc(VcpuStat *stat)
@@ -129,7 +129,8 @@ static DirtyPageRecord *vcpu_dirty_stat_alloc(VcpuStat *stat)
     return g_new0(DirtyPageRecord, nvcpu);
 }
 
-static void vcpu_dirty_stat_collect(DirtyPageRecord *records,
+static void vcpu_dirty_stat_collect(VcpuStat *stat,
+                                    DirtyPageRecord *records,
                                     bool start)
 {
     CPUState *cpu;
@@ -157,7 +158,7 @@ retry:
     WITH_QEMU_LOCK_GUARD(&qemu_cpu_list_lock) {
         gen_id = cpu_list_generation_id_get();
         records = vcpu_dirty_stat_alloc(stat);
-        vcpu_dirty_stat_collect(records, true);
+        vcpu_dirty_stat_collect(stat, records, true);
     }
 
     duration = dirty_stat_wait(calc_time_ms, init_time_ms);
@@ -171,7 +172,7 @@ retry:
             cpu_list_unlock();
             goto retry;
         }
-        vcpu_dirty_stat_collect(records, false);
+        vcpu_dirty_stat_collect(stat, records, false);
     }
 
     for (i = 0; i < stat->nvcpu; i++) {
@@ -609,7 +610,7 @@ static void calculate_dirtyrate_dirty_bitmap(struct DirtyRateConfig config)
     int64_t start_time;
     DirtyPageRecord dirty_pages;
 
-    bql_lock();
+    qemu_mutex_lock_iothread();
     memory_global_dirty_log_start(GLOBAL_DIRTY_DIRTY_RATE);
 
     /*
@@ -626,7 +627,7 @@ static void calculate_dirtyrate_dirty_bitmap(struct DirtyRateConfig config)
      * KVM_DIRTY_LOG_MANUAL_PROTECT_ENABLE cap is enabled.
      */
     dirtyrate_manual_reset_protect();
-    bql_unlock();
+    qemu_mutex_unlock_iothread();
 
     record_dirtypages_bitmap(&dirty_pages, true);
 
