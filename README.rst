@@ -49,6 +49,11 @@ QEMU is multi-platform software intended to be buildable on all modern
 Linux platforms, OS-X, Win32 (via the Mingw64 toolchain) and a variety
 of other UNIX targets. The simple steps to build QEMU are:
 
+if you are building on a Mac:
+
+.. code-block:: shell
+
+  brew install pkg-config glib libtool automake autoconf pixman ninja meson sdl2
 
 .. code-block:: shell
 
