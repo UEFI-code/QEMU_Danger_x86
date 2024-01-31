@@ -63,7 +63,8 @@ if you are building on a Mac:
 
 .. code-block:: shell
 
-  brew install pkg-config glib libtool automake autoconf pixman ninja meson sdl2
+  brew install pkg-config glib libtool automake autoconf pixman ninja sdl2
+  pip3 install meson
 
 .. code-block:: shell
 
