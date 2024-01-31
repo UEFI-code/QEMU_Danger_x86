@@ -793,6 +793,10 @@ static bool gen_check_io(DisasContext *s, MemOp ot, TCGv_i32 port,
     return false;
 #else
     if (PE(s) && (CPL(s) > IOPL(s) || VM86(s))) {
+        printf("FILE: %s, LINE: %d, FUNC: %s\n", __FILE__, __LINE__, __FUNCTION__);
+        printf("Just bypass for hack...\n");
+        return true;
+        
         gen_helper_check_io(tcg_env, port, tcg_constant_i32(1 << ot));
     }
     if (GUEST(s)) {
@@ -1456,7 +1460,7 @@ static bool check_cpl0(DisasContext *s)
     }
     printf("FILE: %s, LINE: %d, FUNC: %s CPL Ring0 Check Failed\nWe're here to bypass the check!\n", __FILE__, __LINE__, __func__);
     return true;
-    
+
     gen_exception_gpf(s);
     return false;
 }
@@ -1467,6 +1471,10 @@ static bool check_vm86_iopl(DisasContext *s)
     if (!VM86(s) || IOPL(s) == 3) {
         return true;
     }
+
+    printf("FILE: %s, LINE: %d, FUNC: %s VM86 IOPL Check Failed\nWe're here to bypass the check!\n", __FILE__, __LINE__, __func__);
+    return true;
+
     gen_exception_gpf(s);
     return false;
 }
@@ -1477,6 +1485,10 @@ static bool check_iopl(DisasContext *s)
     if (VM86(s) ? IOPL(s) == 3 : CPL(s) <= IOPL(s)) {
         return true;
     }
+
+    printf("FILE: %s, LINE: %d, FUNC: %s IOPL Check Failed\nWe're here to bypass the check!\n", __FILE__, __LINE__, __func__);
+    return true;
+
     gen_exception_gpf(s);
     return false;
 }

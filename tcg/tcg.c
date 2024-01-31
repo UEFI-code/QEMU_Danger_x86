@@ -2358,6 +2358,7 @@ void tcg_gen_call2(TCGHelperInfo *info, TCGTemp *ret, TCGTemp *t1, TCGTemp *t2)
 void tcg_gen_call3(TCGHelperInfo *info, TCGTemp *ret, TCGTemp *t1,
                    TCGTemp *t2, TCGTemp *t3)
 {
+    //printf("FILE: %s, LINE: %d, FUNC: %s, I/O check goes here?! So stupid!\n", __FILE__, __LINE__, __func__);
     TCGTemp *args[3] = { t1, t2, t3 };
     tcg_gen_callN(info, ret, args);
 }
