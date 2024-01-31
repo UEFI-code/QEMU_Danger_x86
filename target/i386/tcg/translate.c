@@ -1450,9 +1450,11 @@ static void gen_exception_gpf(DisasContext *s)
 /* Check for cpl == 0; if not, raise #GP and return false. */
 static bool check_cpl0(DisasContext *s)
 {
+    //printf("FILE: %s, LINE: %d, FUNC: %s\n", __FILE__, __LINE__, __func__);
     if (CPL(s) == 0) {
         return true;
     }
+    printf("FILE: %s, LINE: %d, FUNC: %s CPL Ring0 Check Failed\n", __FILE__, __LINE__, __func__);
     gen_exception_gpf(s);
     return false;
 }

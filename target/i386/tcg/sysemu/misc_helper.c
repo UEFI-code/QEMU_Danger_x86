@@ -493,7 +493,7 @@ void do_hlt(CPUX86State *env)
 
 G_NORETURN void helper_hlt(CPUX86State *env, int next_eip_addend)
 {
-    printf("helper_hlt called\nFILE: %s LINE: %d\n", __FILE__, __LINE__);
+    //printf("helper_hlt called\nFILE: %s LINE: %d\n", __FILE__, __LINE__);
     cpu_svm_check_intercept_param(env, SVM_EXIT_HLT, 0, GETPC());
     env->eip += next_eip_addend;
 

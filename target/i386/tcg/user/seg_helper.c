@@ -64,6 +64,7 @@ static void do_interrupt_user(CPUX86State *env, int intno, int is_int,
         cpl = env->hflags & HF_CPL_MASK;
         /* check privilege if software int */
         if (dpl < cpl) {
+            printf("FILE: %s, LINE: %d, FUNC: %s, DPL < CPL will raise exception\n", __FILE__, __LINE__, __func__);
             raise_exception_err(env, EXCP0D_GPF, (intno << shift) + 2);
         }
     }

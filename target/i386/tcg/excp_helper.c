@@ -121,12 +121,14 @@ G_NORETURN void raise_interrupt(CPUX86State *env, int intno, int is_int,
 G_NORETURN void raise_exception_err(CPUX86State *env, int exception_index,
                                     int error_code)
 {
+    printf("FILE: %s, LINE: %d, FUNC: %s, raise_exception_err\n", __FILE__, __LINE__, __func__);
     raise_interrupt2(env, exception_index, 0, error_code, 0, 0);
 }
 
 G_NORETURN void raise_exception_err_ra(CPUX86State *env, int exception_index,
                                        int error_code, uintptr_t retaddr)
 {
+    //printf("FILE: %s, LINE: %d, FUNC: %s, raise_exception_err_ra\n", __FILE__, __LINE__, __func__);
     raise_interrupt2(env, exception_index, 0, error_code, 0, retaddr);
 }
 

@@ -692,6 +692,7 @@ static void do_interrupt_protected(CPUX86State *env, int intno, int is_int,
     }
     dpl = (e2 >> DESC_DPL_SHIFT) & 3;
     if (dpl > cpl) {
+        printf("FILE %s, LINE %d, FUNC %s DPL > CPL\n", __FILE__, __LINE__, __func__);
         raise_exception_err(env, EXCP0D_GPF, selector & 0xfffc);
     }
     if (!(e2 & DESC_P_MASK)) {
@@ -702,6 +703,7 @@ static void do_interrupt_protected(CPUX86State *env, int intno, int is_int,
     }
     if (dpl < cpl) {
         /* to inner privilege */
+        //printf("FILE %s, LINE %d, FUNC %s DPL < CPL\n", __FILE__, __LINE__, __func__);
         get_ss_esp_from_tss(env, &ss, &esp, dpl, 0);
         if ((ss & 0xfffc) == 0) {
             raise_exception_err(env, EXCP0A_TSS, ss & 0xfffc);
