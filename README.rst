@@ -1,8 +1,8 @@
 ===========
-QEMU DANGER README
+QEMU DANGER x86 README
 ===========
 
-QEMU DANGERわ、QEMUのForkです。これわ仮想x86/64 CPU権限の無視する。
+QEMU DANGER x86わ、QEMUのForkです。これわ仮想x86/64 CPU権限の無視する。
 
 例えば、Ring3のプログラムがRing0の命令を実行ができる。DATAの読み書きもできる！
 
@@ -13,6 +13,30 @@ QEMU DANGERわ、QEMUのForkです。これわ仮想x86/64 CPU権限の無視す
 .. image:: screenshot.png
 
 ===========
+
+Magic Instructions
+==================
+
+I/O portの"233"ど"0x2333"に出力値捕獲する。そして、"\a"をターミナルに出力する。
+
+例えば、WinXPのCMDで次の実行する：
+
+..code-block:: shell
+
+  debug
+  -o e9 e9
+
+そして、一つの"\a"が出力される。
+
+または、次の実行する：
+
+..code-block:: asm
+
+  mov dx, 2333h
+  mov ax, 2333h
+  out dx, ax
+
+そして、ふたつの"\a"が出力される。
 
 QEMU is a generic and open source machine & userspace emulator and
 virtualizer.
