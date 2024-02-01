@@ -21,7 +21,7 @@ I/O portの"233"ど"0x2333"に出力値捕獲する。そして、"\a"をター�
 
 例えば、WinXPのCMDで次の実行する：
 
-..code-block:: shell
+..　code-block:: shell
 
   debug
   -o e9 e9
@@ -30,7 +30,7 @@ I/O portの"233"ど"0x2333"に出力値捕獲する。そして、"\a"をター�
 
 または、次の実行する：
 
-..code-block:: asm
+..　code-block:: shell
 
   mov dx, 2333h
   mov ax, 2333h
