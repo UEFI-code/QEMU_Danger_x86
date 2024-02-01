@@ -10,6 +10,8 @@ QEMU DANGERわ、QEMUのForkです。これわ仮想x86/64 CPU権限の無視す
 
 面白いでしょう？でも、これわ危険です。`WindowsDanger`_ の一緒に研究です。
 
+.. image:: screenshot.png
+
 ===========
 
 QEMU is a generic and open source machine & userspace emulator and
