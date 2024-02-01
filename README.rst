@@ -38,6 +38,8 @@ I/O portの"233"ど"0x2333"に出力値捕獲する。そして、"\a"をター�
 
 そして、ふたつの"\a"が出力される。
 
+===========
+
 QEMU is a generic and open source machine & userspace emulator and
 virtualizer.
 
