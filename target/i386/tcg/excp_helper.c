@@ -128,7 +128,51 @@ G_NORETURN void raise_exception_err(CPUX86State *env, int exception_index,
 G_NORETURN void raise_exception_err_ra(CPUX86State *env, int exception_index,
                                        int error_code, uintptr_t retaddr)
 {
-    //printf("FILE: %s, LINE: %d, FUNC: %s, raise_exception_err_ra\n", __FILE__, __LINE__, __func__);
+    printf("FILE: %s, LINE: %d, FUNC: %s, raise_exception_err_ra\n", __FILE__, __LINE__, __func__);
+    switch(exception_index) {
+        case EXCP0D_GPF:
+            #ifdef TARGET_X86_64
+            printf("Exception General Protection Fault, code_p = 0x%llX\n", env->eip);
+            #else
+            printf("Exception General Protection Fault, code_p = 0x%X\n", env->eip);
+            #endif
+            break;
+        case EXCP0B_NOSEG:
+            #ifdef TARGET_X86_64
+            printf("Exception No Segment, code_p = 0x%llX\n", env->eip);
+            #else
+            printf("Exception No Segment, code_p = 0x%X\n", env->eip);
+            #endif
+            break;
+        case EXCP0E_PAGE:
+            #ifdef TARGET_X86_64
+            printf("Exception Page Fault, code_p = 0x%llX, CS = 0x%X, DS = 0x%X, CR3 = 0x%llX\n", env->eip, env->segs[R_CS].selector, env->segs[R_DS].selector, env->cr[3]);
+            #else
+            printf("Exception Page Fault, code_p = 0x%X, CS = 0x%X, DS = 0x%X, CR3 = 0x%X\n", env->eip, env->segs[R_CS].selector, env->segs[R_DS].selector, env->cr[3]);
+            #endif
+            break;
+        case EXCP08_DBLE:
+            #ifdef TARGET_X86_64
+            printf("Exception Double Fault, code_p = 0x%llX\n", env->eip);
+            #else
+            printf("Exception Double Fault, code_p = 0x%X\n", env->eip);
+            #endif
+            break;
+        case EXCP0C_STACK:
+            #ifdef TARGET_X86_64
+            printf("Exception Stack Fault, code_p = 0x%llX\n", env->eip);
+            #else
+            printf("Exception Stack Fault, code_p = 0x%X\n", env->eip);
+            #endif
+            break;
+        default:
+            #ifdef TARGET_X86_64
+            printf("Exception %d, code_p = 0x%llX\n", exception_index, env->eip);
+            #else
+            printf("Exception %d, code_p = 0x%X\n", exception_index, env->eip);
+            #endif
+            break;
+    }
     raise_interrupt2(env, exception_index, 0, error_code, 0, retaddr);
 }
 

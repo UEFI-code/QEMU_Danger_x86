@@ -2035,7 +2035,6 @@ static inline void helper_ret_protected(CPUX86State *env, int shift,
             /* NULL ss is allowed in long mode if cpl != 3 */
             /* XXX: test CS64? */
             if ((env->hflags & HF_LMA_MASK) && rpl != 3) {
-                printf("FILE: %s, LINE: %d, FUNC: %s, NULL SS, will raise exception\n", __FILE__, __LINE__, __func__);
                 cpu_x86_load_seg_cache(env, R_SS, new_ss,
                                        0, 0xffffffff,
                                        DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
