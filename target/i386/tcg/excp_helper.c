@@ -150,6 +150,29 @@ G_NORETURN void raise_exception_err_ra(CPUX86State *env, int exception_index,
             #else
             printf("Exception Page Fault, code_p = 0x%X, CS = 0x%X, DS = 0x%X, CR3 = 0x%X\n", env->eip, env->segs[R_CS].selector, env->segs[R_DS].selector, env->cr[3]);
             #endif
+            
+            if (error_code & 1 == 1) // bit 0
+                printf("Page Fault caused by a page-protection violation, ");
+            else
+                printf("Page Fault caused by a non-present page, ");
+            if (error_code & 2 == 2) // bit 1
+                printf("by a write access, ");
+            else
+                printf("by a read access, ");
+            if (error_code & 4 == 4) // bit 2
+                printf("in Ring3, ");
+            else
+                printf("in Ring0, ");
+            if (error_code & 8 == 8) // bit 3
+                printf("by reserved bit violation, ");
+            if (error_code & 16 == 16) // bit 4
+                printf("by an instruction fetch on NX, ");
+            if (error_code & 32 == 32) // bit 5
+                printf("by a protection key violation, ");
+            if (error_code & 64 == 64) // bit 6
+                printf("by a SGX access violation, ");
+            printf("\n");
+            
             break;
         case EXCP08_DBLE:
             #ifdef TARGET_X86_64
