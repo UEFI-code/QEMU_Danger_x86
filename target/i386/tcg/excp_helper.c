@@ -25,6 +25,145 @@
 #include "exec/helper-proto.h"
 #include "helper-tcg.h"
 
+static __inline void print_exception(int exception_index, CPUX86State *env, int error_code)
+{
+    printf("FILE: %s, LINE: %d, FUNC: %s, raise_exception_err_ra\n", __FILE__, __LINE__, __func__);
+    switch(exception_index) {
+        case EXCP0D_GPF:
+            #ifdef TARGET_X86_64
+            printf("Exception General Protection Fault, code_p = 0x%llX\n", env->eip);
+            #else
+            printf("Exception General Protection Fault, code_p = 0x%X\n", env->eip);
+            #endif
+            break;
+        case EXCP0B_NOSEG:
+            #ifdef TARGET_X86_64
+            printf("Exception No Segment, code_p = 0x%llX\n", env->eip);
+            #else
+            printf("Exception No Segment, code_p = 0x%X\n", env->eip);
+            #endif
+            break;
+        case EXCP0E_PAGE:
+            #ifdef TARGET_X86_64
+            printf("Exception Page Fault, code_p = 0x%llX, CS = 0x%X, DS = 0x%X, CR3 = 0x%llX\n", env->eip, env->segs[R_CS].selector, env->segs[R_DS].selector, env->cr[3]);
+            #else
+            printf("Exception Page Fault, code_p = 0x%X, CS = 0x%X, DS = 0x%X, CR3 = 0x%X\n", env->eip, env->segs[R_CS].selector, env->segs[R_DS].selector, env->cr[3]);
+            #endif
+            
+            if (error_code & 1 == 1) // bit 0
+                printf("Page Fault caused by a Page-Protection violation, ");
+            else
+                printf("Page Fault caused by a Non-Present page, ");
+            if (error_code & 2 == 2) // bit 1
+                printf("by a Write access, ");
+            else
+                printf("by a Read access, ");
+            if (error_code & 4 == 4) // bit 2
+                printf("in Ring3, ");
+            else
+                printf("in Ring0, ");
+            if (error_code & 8 == 8) // bit 3
+                printf("by reserved bit violation, ");
+            if (error_code & 16 == 16) // bit 4
+                printf("by an instruction fetch on NX, ");
+            if (error_code & 32 == 32) // bit 5
+                printf("by a protection key violation, ");
+            if (error_code & 64 == 64) // bit 6
+                printf("by a SGX access violation, ");
+            printf("\n");
+            
+            break;
+        case EXCP08_DBLE:
+            #ifdef TARGET_X86_64
+            printf("Exception Double Fault, code_p = 0x%llX\n", env->eip);
+            #else
+            printf("Exception Double Fault, code_p = 0x%X\n", env->eip);
+            #endif
+            break;
+        case EXCP0C_STACK:
+            #ifdef TARGET_X86_64
+            printf("Exception Stack Fault, code_p = 0x%llX\n", env->eip);
+            #else
+            printf("Exception Stack Fault, code_p = 0x%X\n", env->eip);
+            #endif
+            break;
+        default:
+            #ifdef TARGET_X86_64
+            printf("Exception %d, code_p = 0x%llX\n", exception_index, env->eip);
+            #else
+            printf("Exception %d, code_p = 0x%X\n", exception_index, env->eip);
+            #endif
+            break;
+    }printf("FILE: %s, LINE: %d, FUNC: %s, raise_exception_err_ra\n", __FILE__, __LINE__, __func__);
+    switch(exception_index) {
+        case EXCP0D_GPF:
+            #ifdef TARGET_X86_64
+            printf("Exception General Protection Fault, code_p = 0x%llX\n", env->eip);
+            #else
+            printf("Exception General Protection Fault, code_p = 0x%X\n", env->eip);
+            #endif
+            break;
+        case EXCP0B_NOSEG:
+            #ifdef TARGET_X86_64
+            printf("Exception No Segment, code_p = 0x%llX\n", env->eip);
+            #else
+            printf("Exception No Segment, code_p = 0x%X\n", env->eip);
+            #endif
+            break;
+        case EXCP0E_PAGE:
+            #ifdef TARGET_X86_64
+            printf("Exception Page Fault, code_p = 0x%llX, CS = 0x%X, DS = 0x%X, CR3 = 0x%llX\n", env->eip, env->segs[R_CS].selector, env->segs[R_DS].selector, env->cr[3]);
+            #else
+            printf("Exception Page Fault, code_p = 0x%X, CS = 0x%X, DS = 0x%X, CR3 = 0x%X\n", env->eip, env->segs[R_CS].selector, env->segs[R_DS].selector, env->cr[3]);
+            #endif
+            
+            if (error_code & 1 == 1) // bit 0
+                printf("Page Fault caused by a page-protection violation, ");
+            else
+                printf("Page Fault caused by a non-present page, ");
+            if (error_code & 2 == 2) // bit 1
+                printf("by a write access, ");
+            else
+                printf("by a read access, ");
+            if (error_code & 4 == 4) // bit 2
+                printf("in Ring3, ");
+            else
+                printf("in Ring0, ");
+            if (error_code & 8 == 8) // bit 3
+                printf("by reserved bit violation, ");
+            if (error_code & 16 == 16) // bit 4
+                printf("by an instruction fetch on NX, ");
+            if (error_code & 32 == 32) // bit 5
+                printf("by a protection key violation, ");
+            if (error_code & 64 == 64) // bit 6
+                printf("by a SGX access violation, ");
+            printf("\n");
+            
+            break;
+        case EXCP08_DBLE:
+            #ifdef TARGET_X86_64
+            printf("Exception Double Fault, code_p = 0x%llX\n", env->eip);
+            #else
+            printf("Exception Double Fault, code_p = 0x%X\n", env->eip);
+            #endif
+            break;
+        case EXCP0C_STACK:
+            #ifdef TARGET_X86_64
+            printf("Exception Stack Fault, code_p = 0x%llX\n", env->eip);
+            #else
+            printf("Exception Stack Fault, code_p = 0x%X\n", env->eip);
+            #endif
+            break;
+        default:
+            #ifdef TARGET_X86_64
+            printf("Exception %d, code_p = 0x%llX\n", exception_index, env->eip);
+            #else
+            printf("Exception %d, code_p = 0x%X\n", exception_index, env->eip);
+            #endif
+            break;
+    }
+}
+
 G_NORETURN void helper_raise_interrupt(CPUX86State *env, int intno,
                                           int next_eip_addend)
 {
@@ -93,6 +232,10 @@ void raise_interrupt2(CPUX86State *env, int intno,
                       int next_eip_addend,
                       uintptr_t retaddr)
 {
+    if(!is_int) {
+        print_exception(intno, env, error_code);
+    }
+
     CPUState *cs = env_cpu(env);
 
     if (!is_int) {
@@ -121,81 +264,12 @@ G_NORETURN void raise_interrupt(CPUX86State *env, int intno, int is_int,
 G_NORETURN void raise_exception_err(CPUX86State *env, int exception_index,
                                     int error_code)
 {
-    printf("FILE: %s, LINE: %d, FUNC: %s, raise_exception_err\n", __FILE__, __LINE__, __func__);
     raise_interrupt2(env, exception_index, 0, error_code, 0, 0);
 }
 
 G_NORETURN void raise_exception_err_ra(CPUX86State *env, int exception_index,
                                        int error_code, uintptr_t retaddr)
 {
-    printf("FILE: %s, LINE: %d, FUNC: %s, raise_exception_err_ra\n", __FILE__, __LINE__, __func__);
-    switch(exception_index) {
-        case EXCP0D_GPF:
-            #ifdef TARGET_X86_64
-            printf("Exception General Protection Fault, code_p = 0x%llX\n", env->eip);
-            #else
-            printf("Exception General Protection Fault, code_p = 0x%X\n", env->eip);
-            #endif
-            break;
-        case EXCP0B_NOSEG:
-            #ifdef TARGET_X86_64
-            printf("Exception No Segment, code_p = 0x%llX\n", env->eip);
-            #else
-            printf("Exception No Segment, code_p = 0x%X\n", env->eip);
-            #endif
-            break;
-        case EXCP0E_PAGE:
-            #ifdef TARGET_X86_64
-            printf("Exception Page Fault, code_p = 0x%llX, CS = 0x%X, DS = 0x%X, CR3 = 0x%llX\n", env->eip, env->segs[R_CS].selector, env->segs[R_DS].selector, env->cr[3]);
-            #else
-            printf("Exception Page Fault, code_p = 0x%X, CS = 0x%X, DS = 0x%X, CR3 = 0x%X\n", env->eip, env->segs[R_CS].selector, env->segs[R_DS].selector, env->cr[3]);
-            #endif
-            
-            if (error_code & 1 == 1) // bit 0
-                printf("Page Fault caused by a page-protection violation, ");
-            else
-                printf("Page Fault caused by a non-present page, ");
-            if (error_code & 2 == 2) // bit 1
-                printf("by a write access, ");
-            else
-                printf("by a read access, ");
-            if (error_code & 4 == 4) // bit 2
-                printf("in Ring3, ");
-            else
-                printf("in Ring0, ");
-            if (error_code & 8 == 8) // bit 3
-                printf("by reserved bit violation, ");
-            if (error_code & 16 == 16) // bit 4
-                printf("by an instruction fetch on NX, ");
-            if (error_code & 32 == 32) // bit 5
-                printf("by a protection key violation, ");
-            if (error_code & 64 == 64) // bit 6
-                printf("by a SGX access violation, ");
-            printf("\n");
-            
-            break;
-        case EXCP08_DBLE:
-            #ifdef TARGET_X86_64
-            printf("Exception Double Fault, code_p = 0x%llX\n", env->eip);
-            #else
-            printf("Exception Double Fault, code_p = 0x%X\n", env->eip);
-            #endif
-            break;
-        case EXCP0C_STACK:
-            #ifdef TARGET_X86_64
-            printf("Exception Stack Fault, code_p = 0x%llX\n", env->eip);
-            #else
-            printf("Exception Stack Fault, code_p = 0x%X\n", env->eip);
-            #endif
-            break;
-        default:
-            #ifdef TARGET_X86_64
-            printf("Exception %d, code_p = 0x%llX\n", exception_index, env->eip);
-            #else
-            printf("Exception %d, code_p = 0x%X\n", exception_index, env->eip);
-            #endif
-            break;
-    }
     raise_interrupt2(env, exception_index, 0, error_code, 0, retaddr);
 }
 
