@@ -1001,7 +1001,7 @@ void helper_sysret(CPUX86State *env, int dflag)
                         | ID_MASK | IF_MASK | IOPL_MASK | VM_MASK | RF_MASK |
                         NT_MASK);
         if (dflag == 2) {
-            cpu_x86_load_seg_cache(env, R_CS, (selector + 16) | 3,
+            cpu_x86_load_seg_cache(env, R_CS, (selector + 16), // Kept it as original!
                                    0, 0xffffffff,
                                    DESC_G_MASK | DESC_P_MASK |
                                    DESC_S_MASK | (3 << DESC_DPL_SHIFT) |
@@ -1009,14 +1009,14 @@ void helper_sysret(CPUX86State *env, int dflag)
                                    DESC_L_MASK);
             env->eip = env->regs[R_ECX];
         } else {
-            cpu_x86_load_seg_cache(env, R_CS, selector | 3,
+            cpu_x86_load_seg_cache(env, R_CS, selector, // Kept it as original!
                                    0, 0xffffffff,
                                    DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
                                    DESC_S_MASK | (3 << DESC_DPL_SHIFT) |
                                    DESC_CS_MASK | DESC_R_MASK | DESC_A_MASK);
             env->eip = (uint32_t)env->regs[R_ECX];
         }
-        cpu_x86_load_seg_cache(env, R_SS, (selector + 8) | 3,
+        cpu_x86_load_seg_cache(env, R_SS, (selector + 8), // Kept it as original!
                                0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
                                DESC_S_MASK | (3 << DESC_DPL_SHIFT) |
@@ -1025,13 +1025,13 @@ void helper_sysret(CPUX86State *env, int dflag)
 #endif
     {
         env->eflags |= IF_MASK;
-        cpu_x86_load_seg_cache(env, R_CS, selector | 3,
+        cpu_x86_load_seg_cache(env, R_CS, selector, // Kept it as original!
                                0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
                                DESC_S_MASK | (3 << DESC_DPL_SHIFT) |
                                DESC_CS_MASK | DESC_R_MASK | DESC_A_MASK);
         env->eip = (uint32_t)env->regs[R_ECX];
-        cpu_x86_load_seg_cache(env, R_SS, (selector + 8) | 3,
+        cpu_x86_load_seg_cache(env, R_SS, (selector + 8), // Kept it as original!
                                0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
                                DESC_S_MASK | (3 << DESC_DPL_SHIFT) |
