@@ -25,48 +25,48 @@
 #include "exec/helper-proto.h"
 #include "helper-tcg.h"
 
-static __inline void print_exception(int exception_index, CPUX86State *env, int error_code)
+static __inline void print_exception(int exception_index, CPUX86State *env, int error_code, uintptr_t p_handler)
 {
     printf("FILE: %s, LINE: %d, FUNC: %s, raise_exception_err_ra, ", __FILE__, __LINE__, __func__);
     switch(exception_index) {
         case EXCP0D_GPF:
-            printf("Exception General Protection Fault, code_p = 0x%llX\n", env->eip);
+            printf("Exception General Protection Fault, code_p = 0x%llX, Will goto 0x%llX\n", env->eip, p_handler);
             break;
         case EXCP0B_NOSEG:
-            printf("Exception No Segment, code_p = 0x%llX\n", env->eip);
+            printf("Exception No Segment, code_p = 0x%llX, Will goto 0x%llX\n", env->eip, p_handler);
             break;
         case EXCP0E_PAGE:
             printf("Exception Page Fault, code_p = 0x%llX, CS = 0x%X, DS = 0x%X, CR3 = 0x%llX, CR2 = 0x%llX, ", env->eip, env->segs[R_CS].selector, env->segs[R_DS].selector, env->cr[3], env->cr[2]);
-            if (error_code & 1 == 1) // bit 0
+            if ((error_code & 1) == 1) // bit 0
                 printf("Page Fault caused by a Page-Protection violation, ");
             else
                 printf("Page Fault caused by a Non-Present page, ");
-            if (error_code & 2 == 2) // bit 1
+            if ((error_code & 2) == 2) // bit 1
                 printf("by a Write access, ");
             else
                 printf("by a Read access, ");
-            if (error_code & 4 == 4) // bit 2
+            if ((error_code & 4) == 4) // bit 2
                 printf("in Ring3, ");
             else
                 printf("in Ring0, ");
-            if (error_code & 8 == 8) // bit 3
+            if ((error_code & 8) == 8) // bit 3
                 printf("by reserved bit violation, ");
-            if (error_code & 16 == 16) // bit 4
+            if ((error_code & 16) == 16) // bit 4
                 printf("by an instruction fetch on NX, ");
-            if (error_code & 32 == 32) // bit 5
+            if ((error_code & 32) == 32) // bit 5
                 printf("by a protection key violation, ");
-            if (error_code & 64 == 64) // bit 6
+            if ((error_code & 64) == 64) // bit 6
                 printf("by a SGX access violation, ");
-            printf("\n");
+            printf("Will goto 0x%llX\n", p_handler);
             break;
         case EXCP08_DBLE:
-            printf("Exception Double Fault, code_p = 0x%llX\n", env->eip);
+            printf("Exception Double Fault, code_p = 0x%llX, Will goto 0x%llX\n", env->eip, p_handler);
             break;
         case EXCP0C_STACK:
-            printf("Exception Stack Fault, code_p = 0x%llX\n", env->eip);
+            printf("Exception Stack Fault, code_p = 0x%llX, Will goto 0x%llX\n", env->eip, p_handler);
             break;
         default:
-            printf("Exception %d, code_p = 0x%llX\n", exception_index, env->eip);
+            printf("Exception %d, code_p = 0x%llX, Will goto 0x%llX\n", exception_index, env->eip, p_handler);
             break;
     }
 }
@@ -124,6 +124,7 @@ static int check_exception(CPUX86State *env, int intno, int *error_code,
         env->old_exception = intno;
     }
 
+    print_exception(intno, env, *error_code, 0);
     return intno;
 }
 
@@ -139,10 +140,6 @@ void raise_interrupt2(CPUX86State *env, int intno,
                       int next_eip_addend,
                       uintptr_t retaddr)
 {
-    if(!is_int) {
-        print_exception(intno, env, error_code);
-    }
-
     CPUState *cs = env_cpu(env);
 
     if (!is_int) {
