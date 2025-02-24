@@ -24,10 +24,12 @@
 #include "sysemu/runstate.h"
 #include "exec/helper-proto.h"
 #include "helper-tcg.h"
+#include "seg_helper.h"
+#include "exec/cpu_ldst.h"
 
 static __inline void print_exception(int exception_index, CPUX86State *env, int error_code, uintptr_t p_handler)
 {
-    printf("FILE: %s, LINE: %d, FUNC: %s, raise_exception_err_ra, ", __FILE__, __LINE__, __func__);
+    printf("FILE: %s, LINE: %d, FUNC: %s, ", __FILE__, __LINE__, __func__);
     switch(exception_index) {
         case EXCP0D_GPF:
             printf("Exception General Protection Fault, code_p = 0x%llX, Will goto 0x%llX\n", env->eip, p_handler);
@@ -124,7 +126,28 @@ static int check_exception(CPUX86State *env, int intno, int *error_code,
         env->old_exception = intno;
     }
 
-    print_exception(intno, env, *error_code, 0);
+    #ifdef TARGET_X86_64
+    uint64_t handler = 0;
+    if ((intno * 16 + 15) > env->idt.limit) {
+        goto pr_;
+    }
+    uintptr_t p_idt_item = env->idt.base + intno * 16;
+    uint32_t e0 = cpu_ldl_kernel(env, p_idt_item);
+    uint32_t e1 = cpu_ldl_kernel(env, p_idt_item + 4);
+    uint32_t e2 = cpu_ldl_kernel(env, p_idt_item + 8);
+    handler = ((target_ulong)e2 << 32) | (e1 & 0xffff0000) | (e0 & 0x0000ffff);
+    #else
+    uint32_t handler = 0
+    if ((intno * 8 + 7) > env->idt.limit) {
+        goto pr_;
+    }
+    uintptr_t p_idt_item = env->idt.base + intno * 8;
+    uint32_t e0 = cpu_ldl_kernel(env, p_idt_item);
+    uint32_t e1 = cpu_ldl_kernel(env, p_idt_item + 4);
+    handler = (e1 & 0xffff0000) | (e0 & 0x0000ffff);
+    #endif
+    pr_:
+    print_exception(intno, env, *error_code, handler);
     return intno;
 }
 

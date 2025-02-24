@@ -125,7 +125,7 @@ static inline void load_seg_vm(CPUX86State *env, int seg, int selector)
 
     cpu_x86_load_seg_cache(env, seg, selector, (selector << 4), 0xffff,
                            DESC_P_MASK | DESC_S_MASK | DESC_W_MASK |
-                           DESC_A_MASK | (3 << DESC_DPL_SHIFT));
+                           DESC_A_MASK | (0 << DESC_DPL_SHIFT));
 }
 
 static inline void get_ss_esp_from_tss(CPUX86State *env, uint32_t *ss_ptr,
@@ -811,6 +811,7 @@ static void do_interrupt_protected(CPUX86State *env, int intno, int is_int,
                    get_seg_limit(e1, e2),
                    e2);
     env->eip = offset;
+    //printf("FILE %s, LINE %d, FUNC %s, will jmp InterruptHandler 0x%llX\n", __FILE__, __LINE__, __func__, env->eip);
 }
 
 #ifdef TARGET_X86_64
@@ -979,6 +980,7 @@ static void do_interrupt64(CPUX86State *env, int intno, int is_int,
                    get_seg_limit(e1, e2),
                    e2);
     env->eip = offset;
+    //printf("FILE %s, LINE %d, FUNC %s, will jmp InterruptHandler 0x%llX\n", __FILE__, __LINE__, __func__, env->eip);
 }
 #endif /* TARGET_X86_64 */
 
@@ -1004,7 +1006,7 @@ void helper_sysret(CPUX86State *env, int dflag)
             cpu_x86_load_seg_cache(env, R_CS, (selector + 16), // Kept it as original!
                                    0, 0xffffffff,
                                    DESC_G_MASK | DESC_P_MASK |
-                                   DESC_S_MASK | (3 << DESC_DPL_SHIFT) |
+                                   DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
                                    DESC_CS_MASK | DESC_R_MASK | DESC_A_MASK |
                                    DESC_L_MASK);
             env->eip = env->regs[R_ECX];
@@ -1012,14 +1014,14 @@ void helper_sysret(CPUX86State *env, int dflag)
             cpu_x86_load_seg_cache(env, R_CS, selector, // Kept it as original!
                                    0, 0xffffffff,
                                    DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
-                                   DESC_S_MASK | (3 << DESC_DPL_SHIFT) |
+                                   DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
                                    DESC_CS_MASK | DESC_R_MASK | DESC_A_MASK);
             env->eip = (uint32_t)env->regs[R_ECX];
         }
         cpu_x86_load_seg_cache(env, R_SS, (selector + 8), // Kept it as original!
                                0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
-                               DESC_S_MASK | (3 << DESC_DPL_SHIFT) |
+                               DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
                                DESC_W_MASK | DESC_A_MASK);
     } else
 #endif
@@ -1028,13 +1030,13 @@ void helper_sysret(CPUX86State *env, int dflag)
         cpu_x86_load_seg_cache(env, R_CS, selector, // Kept it as original!
                                0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
-                               DESC_S_MASK | (3 << DESC_DPL_SHIFT) |
+                               DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
                                DESC_CS_MASK | DESC_R_MASK | DESC_A_MASK);
         env->eip = (uint32_t)env->regs[R_ECX];
         cpu_x86_load_seg_cache(env, R_SS, (selector + 8), // Kept it as original!
                                0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
-                               DESC_S_MASK | (3 << DESC_DPL_SHIFT) |
+                               DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
                                DESC_W_MASK | DESC_A_MASK);
     }
 }
@@ -2222,13 +2224,13 @@ void helper_sysexit(CPUX86State *env, int dflag)
         cpu_x86_load_seg_cache(env, R_CS, ((env->sysenter_cs + 32) & 0xfffc) |
                                3, 0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
-                               DESC_S_MASK | (3 << DESC_DPL_SHIFT) |
+                               DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
                                DESC_CS_MASK | DESC_R_MASK | DESC_A_MASK |
                                DESC_L_MASK);
         cpu_x86_load_seg_cache(env, R_SS, ((env->sysenter_cs + 40) & 0xfffc) |
                                3, 0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
-                               DESC_S_MASK | (3 << DESC_DPL_SHIFT) |
+                               DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
                                DESC_W_MASK | DESC_A_MASK);
     } else
 #endif
@@ -2236,12 +2238,12 @@ void helper_sysexit(CPUX86State *env, int dflag)
         cpu_x86_load_seg_cache(env, R_CS, ((env->sysenter_cs + 16) & 0xfffc) |
                                3, 0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
-                               DESC_S_MASK | (3 << DESC_DPL_SHIFT) |
+                               DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
                                DESC_CS_MASK | DESC_R_MASK | DESC_A_MASK);
         cpu_x86_load_seg_cache(env, R_SS, ((env->sysenter_cs + 24) & 0xfffc) |
                                3, 0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
-                               DESC_S_MASK | (3 << DESC_DPL_SHIFT) |
+                               DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
                                DESC_W_MASK | DESC_A_MASK);
     }
     env->regs[R_ESP] = env->regs[R_ECX];
