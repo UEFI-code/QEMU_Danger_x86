@@ -28,10 +28,11 @@
 
 void helper_outb(CPUX86State *env, uint32_t port, uint32_t data)
 {
-    if (port == 233 && data == 233)
+    if (port == 233)
     {
-        printf("Captured the magic out number!\n\a");
-        printf("helper_outb called\nFILE: %s LINE: %d\n", __FILE__, __LINE__);
+        data &= 0xFF;
+        printf("Captured the Magic 0x%2X @ port 233, %s %s %d\a\a\n", data, __FILE__, __func__, __LINE__);
+        return;
     }
 
     address_space_stb(&address_space_io, port, data,
@@ -47,10 +48,11 @@ target_ulong helper_inb(CPUX86State *env, uint32_t port)
 void helper_outw(CPUX86State *env, uint32_t port, uint32_t data)
 {
     //printf("helper_outw called\nFILE: %s LINE: %d\n", __FILE__, __LINE__);
-    if (port == 0x2333 && data == 0x2333)
+    if (port == 0x2333)
     {
-        printf("Captured the magic out number!\n\a\a");
-        printf("helper_outw called\nFILE: %s LINE: %d\n", __FILE__, __LINE__);
+        data &= 0xFFFF;
+        printf("Captured the Magic 0x%4X @ port 0x2333, %s %s %d\a\a\n", data, __FILE__, __func__, __LINE__);
+        return;
     }
 
     address_space_stw(&address_space_io, port, data,
