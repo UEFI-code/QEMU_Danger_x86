@@ -2,22 +2,23 @@
 QEMU DANGER x86 README
 ===========
 
-QEMU DANGER x86わ、QEMUのForkです。これわ仮想x86/64 CPU権限の無視する。
+QEMU DANGER x86わ、QEMUの改訂です。これで仮想x86/64 CPU権限の無視/改訂出来る！
 
-例えば、Ring3のプログラムがRing0の命令を実行ができる。DATAの読み書きもできる！
+例えば、Ring3のプログラムがRing0の命令を実行又はDATAの読み書きもできる！
 
 .. _WindowsDanger: https://github.com/UEFI-code/WindowsDanger
+.. _LinuxDanger: https://github.com/UEFI-code/linux-danger
 
-面白いでしょう？でも、これわ危険です。`WindowsDanger`_ の一緒に研究です。
+`WindowsDanger`_ と `LinuxDanger`_ 一緒に研究します
 
 .. image:: screenshot.png
 
 ===========
 
-Magic Instructions
+Magic Instructions for Debugging
 ==================
 
-I/O portの"233"ど"0x2333"に出力値捕獲する。そして、"\a"をターミナルに出力する。
+I/O portの"233"ど"0x2333"に出力値捕獲する。そして、"\a"又はプロンプトをターミナルに出力する。
 
 例えば、WinXPのCMDで次の実行する：
 
