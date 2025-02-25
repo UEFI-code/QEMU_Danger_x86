@@ -125,7 +125,7 @@ static inline void load_seg_vm(CPUX86State *env, int seg, int selector)
 
     cpu_x86_load_seg_cache(env, seg, selector, (selector << 4), 0xffff,
                            DESC_P_MASK | DESC_S_MASK | DESC_W_MASK |
-                           DESC_A_MASK | (0 << DESC_DPL_SHIFT));
+                           DESC_A_MASK | ((selector & 3) << DESC_DPL_SHIFT));
 }
 
 static inline void get_ss_esp_from_tss(CPUX86State *env, uint32_t *ss_ptr,
@@ -844,10 +844,12 @@ static inline target_ulong get_rsp_from_tss(CPUX86State *env, int level)
 #endif
 
     if (!(env->tr.flags & DESC_P_MASK)) {
+        printf("FILE %s, LINE %d, FUNC %s err\n", __FILE__, __LINE__, __func__);
         cpu_abort(CPU(cpu), "invalid tss");
     }
     index = 8 * level + 4;
     if ((index + 7) > env->tr.limit) {
+        printf("FILE %s, LINE %d, FUNC %s err\n", __FILE__, __LINE__, __func__);
         raise_exception_err(env, EXCP0A_TSS, env->tr.selector & 0xfffc);
     }
 
@@ -857,6 +859,7 @@ static inline target_ulong get_rsp_from_tss(CPUX86State *env, int level)
     pg_mode = get_pg_mode(env);
     sext = (int64_t)rsp >> (pg_mode & PG_MODE_LA57 ? 56 : 47);
     if (sext != 0 && sext != -1) {
+        printf("FILE %s, LINE %d, FUNC %s err\n", __FILE__, __LINE__, __func__);
         raise_exception_err(env, EXCP0C_STACK, 0);
     }
 
@@ -867,6 +870,7 @@ static inline target_ulong get_rsp_from_tss(CPUX86State *env, int level)
 static void do_interrupt64(CPUX86State *env, int intno, int is_int,
                            int error_code, target_ulong next_eip, int is_hw)
 {
+    //printf("FILE %s, LINE %d, FUNC %s\n", __FILE__, __LINE__, __func__);
     SegmentCache *dt;
     target_ulong ptr;
     int type, dpl, selector, cpl, ist;
@@ -906,39 +910,49 @@ static void do_interrupt64(CPUX86State *env, int intno, int is_int,
     cpl = env->hflags & HF_CPL_MASK;
     /* check privilege if software int */
     if (is_int && dpl < cpl) {
+        //printf("FILE %s, LINE %d, FUNC %s DPL < CPL\n", __FILE__, __LINE__, __func__);
         raise_exception_err(env, EXCP0D_GPF, intno * 8 + 2);
     }
     /* check valid bit */
     if (!(e2 & DESC_P_MASK)) {
+        //printf("FILE %s, LINE %d, FUNC %s err\n", __FILE__, __LINE__, __func__);
         raise_exception_err(env, EXCP0B_NOSEG, intno * 8 + 2);
     }
     selector = e1 >> 16;
     offset = ((target_ulong)e3 << 32) | (e2 & 0xffff0000) | (e1 & 0x0000ffff);
+    printf("FILE %s, LINE %d, FUNC %s, prepare to jmp 0x%llX......", __FILE__, __LINE__, __func__, offset);
     ist = e2 & 7;
     if ((selector & 0xfffc) == 0) {
+        //printf("FILE %s, LINE %d, FUNC %s selector == 0\n", __FILE__, __LINE__, __func__);
         raise_exception_err(env, EXCP0D_GPF, 0);
     }
 
     if (load_segment(env, &e1, &e2, selector) != 0) {
+        //printf("FILE %s, LINE %d, FUNC %s load_segment err\n", __FILE__, __LINE__, __func__);
         raise_exception_err(env, EXCP0D_GPF, selector & 0xfffc);
     }
     if (!(e2 & DESC_S_MASK) || !(e2 & (DESC_CS_MASK))) {
+        //printf("FILE %s, LINE %d, FUNC %s err\n", __FILE__, __LINE__, __func__);
         raise_exception_err(env, EXCP0D_GPF, selector & 0xfffc);
     }
     dpl = (e2 >> DESC_DPL_SHIFT) & 3;
     if (dpl > cpl) {
+        //printf("FILE %s, LINE %d, FUNC %s DPL > CPL\n", __FILE__, __LINE__, __func__);
         raise_exception_err(env, EXCP0D_GPF, selector & 0xfffc);
     }
     if (!(e2 & DESC_P_MASK)) {
+        //printf("FILE %s, LINE %d, FUNC %s err\n", __FILE__, __LINE__, __func__);
         raise_exception_err(env, EXCP0B_NOSEG, selector & 0xfffc);
     }
     if (!(e2 & DESC_L_MASK) || (e2 & DESC_B_MASK)) {
+        //printf("FILE %s, LINE %d, FUNC %s err\n", __FILE__, __LINE__, __func__);
         raise_exception_err(env, EXCP0D_GPF, selector & 0xfffc);
     }
     if (e2 & DESC_C_MASK) {
         dpl = cpl;
     }
     if (dpl < cpl || ist != 0) {
+        // Here, will affect the "Ring0 Usermode"
         /* to inner privilege */
         new_stack = 1;
         esp = get_rsp_from_tss(env, ist != 0 ? ist + 3 : dpl);
@@ -946,22 +960,30 @@ static void do_interrupt64(CPUX86State *env, int intno, int is_int,
     } else {
         /* to same privilege */
         if (env->eflags & VM_MASK) {
+            //printf("FILE %s, LINE %d, FUNC %s VM_MASK err\n", __FILE__, __LINE__, __func__);
             raise_exception_err(env, EXCP0D_GPF, selector & 0xfffc);
         }
         new_stack = 0;
         esp = env->regs[R_ESP];
     }
     esp &= ~0xfLL; /* align stack */
+    printf("After align stack, esp = 0x%llX, env-segs[R_SS].selector = 0x%llX......", esp, env->segs[R_SS].selector);
 
     PUSHQ(esp, env->segs[R_SS].selector);
+    printf("After PUSHQ ss......");
     PUSHQ(esp, env->regs[R_ESP]);
+    printf("After PUSHQ esp......");
     PUSHQ(esp, cpu_compute_eflags(env));
+    printf("After PUSHQ eflags......");
     PUSHQ(esp, env->segs[R_CS].selector);
+    printf("After PUSHQ CS......");
     PUSHQ(esp, old_eip);
+    printf("After PUSHQ old_eip......");
     if (has_error_code) {
         PUSHQ(esp, error_code);
+        printf("After PUSHQ error_code......");
     }
-
+    //printf("FILE %s, LINE %d, FUNC %s, After PUSHQ......", __FILE__, __LINE__, __func__);
     /* interrupt gate clear IF mask */
     if ((type & 1) == 0) {
         env->eflags &= ~IF_MASK;
@@ -973,6 +995,7 @@ static void do_interrupt64(CPUX86State *env, int intno, int is_int,
         cpu_x86_load_seg_cache(env, R_SS, ss, 0, 0, dpl << DESC_DPL_SHIFT);
     }
     env->regs[R_ESP] = esp;
+    printf("FILE %s, LINE %d, FUNC %s, After load SS......", __FILE__, __LINE__, __func__);
 
     selector = (selector & ~3) | dpl;
     cpu_x86_load_seg_cache(env, R_CS, selector,
@@ -980,7 +1003,7 @@ static void do_interrupt64(CPUX86State *env, int intno, int is_int,
                    get_seg_limit(e1, e2),
                    e2);
     env->eip = offset;
-    //printf("FILE %s, LINE %d, FUNC %s, will jmp InterruptHandler 0x%llX\n", __FILE__, __LINE__, __func__, env->eip);
+    printf("FILE %s, LINE %d, FUNC %s, will jmp InterruptHandler 0x%llX\n", __FILE__, __LINE__, __func__, env->eip);
 }
 #endif /* TARGET_X86_64 */
 
@@ -1003,40 +1026,45 @@ void helper_sysret(CPUX86State *env, int dflag)
                         | ID_MASK | IF_MASK | IOPL_MASK | VM_MASK | RF_MASK |
                         NT_MASK);
         if (dflag == 2) {
-            cpu_x86_load_seg_cache(env, R_CS, (selector + 16), // Kept it as original!
+            uint16_t _CS = selector + 16;
+            cpu_x86_load_seg_cache(env, R_CS, _CS, // Kept it as original!
                                    0, 0xffffffff,
                                    DESC_G_MASK | DESC_P_MASK |
-                                   DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
+                                   DESC_S_MASK | ((_CS & 3) << DESC_DPL_SHIFT) |
                                    DESC_CS_MASK | DESC_R_MASK | DESC_A_MASK |
                                    DESC_L_MASK);
             env->eip = env->regs[R_ECX];
         } else {
+            // _CS = selector;
             cpu_x86_load_seg_cache(env, R_CS, selector, // Kept it as original!
                                    0, 0xffffffff,
                                    DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
-                                   DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
+                                   DESC_S_MASK | ((selector & 3) << DESC_DPL_SHIFT) |
                                    DESC_CS_MASK | DESC_R_MASK | DESC_A_MASK);
             env->eip = (uint32_t)env->regs[R_ECX];
         }
-        cpu_x86_load_seg_cache(env, R_SS, (selector + 8), // Kept it as original!
+        uint16_t _SS = selector + 8;
+        cpu_x86_load_seg_cache(env, R_SS, _SS, // Kept it as original!
                                0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
-                               DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
+                               DESC_S_MASK | ((_SS & 3) << DESC_DPL_SHIFT) |
                                DESC_W_MASK | DESC_A_MASK);
     } else
 #endif
     {
+        uint16_t _CS = selector;
+        uint16_t _SS = selector + 8;
         env->eflags |= IF_MASK;
-        cpu_x86_load_seg_cache(env, R_CS, selector, // Kept it as original!
+        cpu_x86_load_seg_cache(env, R_CS, _CS, // Kept it as original!
                                0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
-                               DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
+                               DESC_S_MASK | ((_CS & 3) << DESC_DPL_SHIFT) |
                                DESC_CS_MASK | DESC_R_MASK | DESC_A_MASK);
         env->eip = (uint32_t)env->regs[R_ECX];
-        cpu_x86_load_seg_cache(env, R_SS, (selector + 8), // Kept it as original!
+        cpu_x86_load_seg_cache(env, R_SS, _SS, // Kept it as original!
                                0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
-                               DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
+                               DESC_S_MASK | ((_SS & 3) << DESC_DPL_SHIFT) |
                                DESC_W_MASK | DESC_A_MASK);
     }
 }
@@ -2221,29 +2249,29 @@ void helper_sysexit(CPUX86State *env, int dflag)
     }
 #ifdef TARGET_X86_64
     if (dflag == 2) {
-        cpu_x86_load_seg_cache(env, R_CS, ((env->sysenter_cs + 32) & 0xfffc) |
-                               3, 0, 0xffffffff,
+        uint16_t _CS = (env->sysenter_cs + 32) & 0xffff;
+        uint16_t _SS = (env->sysenter_cs + 40) & 0xffff;
+        cpu_x86_load_seg_cache(env, R_CS, _CS, 0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
-                               DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
+                               DESC_S_MASK | ((_CS & 3) << DESC_DPL_SHIFT) |
                                DESC_CS_MASK | DESC_R_MASK | DESC_A_MASK |
                                DESC_L_MASK);
-        cpu_x86_load_seg_cache(env, R_SS, ((env->sysenter_cs + 40) & 0xfffc) |
-                               3, 0, 0xffffffff,
+        cpu_x86_load_seg_cache(env, R_SS, _SS, 0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
-                               DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
+                               DESC_S_MASK | ((_SS & 3) << DESC_DPL_SHIFT) |
                                DESC_W_MASK | DESC_A_MASK);
     } else
 #endif
     {
-        cpu_x86_load_seg_cache(env, R_CS, ((env->sysenter_cs + 16) & 0xfffc) |
-                               3, 0, 0xffffffff,
+        uint16_t _CS = (env->sysenter_cs + 16) & 0xffff;
+        uint16_t _SS = (env->sysenter_cs + 24) & 0xffff;
+        cpu_x86_load_seg_cache(env, R_CS, _CS, 0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
-                               DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
+                               DESC_S_MASK | ((_CS & 3) << DESC_DPL_SHIFT) |
                                DESC_CS_MASK | DESC_R_MASK | DESC_A_MASK);
-        cpu_x86_load_seg_cache(env, R_SS, ((env->sysenter_cs + 24) & 0xfffc) |
-                               3, 0, 0xffffffff,
+        cpu_x86_load_seg_cache(env, R_SS, _SS, 0, 0xffffffff,
                                DESC_G_MASK | DESC_B_MASK | DESC_P_MASK |
-                               DESC_S_MASK | (0 << DESC_DPL_SHIFT) |
+                               DESC_S_MASK | ((_SS & 3) << DESC_DPL_SHIFT) |
                                DESC_W_MASK | DESC_A_MASK);
     }
     env->regs[R_ESP] = env->regs[R_ECX];

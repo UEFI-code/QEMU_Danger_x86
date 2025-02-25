@@ -38,7 +38,7 @@ static __inline void print_exception(int exception_index, CPUX86State *env, int 
             printf("Exception No Segment, code_p = 0x%llX, Will goto 0x%llX\n", env->eip, p_handler);
             break;
         case EXCP0E_PAGE:
-            printf("Exception Page Fault, code_p = 0x%llX, CS = 0x%X, DS = 0x%X, CR3 = 0x%llX, CR2 = 0x%llX, ", env->eip, env->segs[R_CS].selector, env->segs[R_DS].selector, env->cr[3], env->cr[2]);
+            printf("Exception Page Fault, code_p = 0x%llX, CS = 0x%X, DS = 0x%X, SS = 0x%X, CR3 = 0x%llX, CR2 = 0x%llX, ", env->eip, env->segs[R_CS].selector, env->segs[R_DS].selector, env->segs[R_SS].selector, env->cr[3], env->cr[2]);
             if ((error_code & 1) == 1) // bit 0
                 printf("Page Fault caused by a Page-Protection violation, ");
             else
@@ -59,10 +59,10 @@ static __inline void print_exception(int exception_index, CPUX86State *env, int 
                 printf("by a protection key violation, ");
             if ((error_code & 64) == 64) // bit 6
                 printf("by a SGX access violation, ");
-            printf("Will goto 0x%llX\n", p_handler);
+            printf("Handler = 0x%llX\n", p_handler);
             break;
         case EXCP08_DBLE:
-            printf("Exception Double Fault, code_p = 0x%llX, Will goto 0x%llX\n", env->eip, p_handler);
+            printf("Exception Double Fault, code_p = 0x%llX, CS = 0x%X, DS = 0x%X, SS = 0x%X, CR3 = 0x%llX, CR2 = 0x%llX, Handler = 0x%llX\n", env->eip, env->segs[R_CS].selector, env->segs[R_DS].selector, env->segs[R_SS].selector, env->cr[3], env->cr[2], p_handler);
             break;
         case EXCP0C_STACK:
             printf("Exception Stack Fault, code_p = 0x%llX, Will goto 0x%llX\n", env->eip, p_handler);
