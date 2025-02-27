@@ -920,7 +920,7 @@ static void do_interrupt64(CPUX86State *env, int intno, int is_int,
     }
     selector = e1 >> 16;
     offset = ((target_ulong)e3 << 32) | (e2 & 0xffff0000) | (e1 & 0x0000ffff);
-    printf("FILE %s, LINE %d, FUNC %s, prepare to jmp 0x%llX......", __FILE__, __LINE__, __func__, offset);
+    //printf("FILE %s, LINE %d, FUNC %s, prepare to jmp 0x%llX......", __FILE__, __LINE__, __func__, offset);
     ist = e2 & 7;
     if ((selector & 0xfffc) == 0) {
         //printf("FILE %s, LINE %d, FUNC %s selector == 0\n", __FILE__, __LINE__, __func__);
@@ -967,21 +967,21 @@ static void do_interrupt64(CPUX86State *env, int intno, int is_int,
         esp = env->regs[R_ESP];
     }
     esp &= ~0xfLL; /* align stack */
-    printf("After align stack, esp = 0x%llX, env-segs[R_SS].selector = 0x%llX......", esp, env->segs[R_SS].selector);
+    //printf("After align stack, esp = 0x%llX, env-segs[R_SS].selector = 0x%llX......", esp, env->segs[R_SS].selector);
 
     PUSHQ(esp, env->segs[R_SS].selector);
-    printf("After PUSHQ ss......");
+    //printf("After PUSHQ ss......");
     PUSHQ(esp, env->regs[R_ESP]);
-    printf("After PUSHQ esp......");
+    //printf("After PUSHQ esp......");
     PUSHQ(esp, cpu_compute_eflags(env));
-    printf("After PUSHQ eflags......");
+    //printf("After PUSHQ eflags......");
     PUSHQ(esp, env->segs[R_CS].selector);
-    printf("After PUSHQ CS......");
+    //printf("After PUSHQ CS......");
     PUSHQ(esp, old_eip);
-    printf("After PUSHQ old_eip......");
+    //printf("After PUSHQ old_eip......");
     if (has_error_code) {
         PUSHQ(esp, error_code);
-        printf("After PUSHQ error_code......");
+        //printf("After PUSHQ error_code......");
     }
     //printf("FILE %s, LINE %d, FUNC %s, After PUSHQ......", __FILE__, __LINE__, __func__);
     /* interrupt gate clear IF mask */
@@ -995,7 +995,7 @@ static void do_interrupt64(CPUX86State *env, int intno, int is_int,
         cpu_x86_load_seg_cache(env, R_SS, ss, 0, 0, dpl << DESC_DPL_SHIFT);
     }
     env->regs[R_ESP] = esp;
-    printf("FILE %s, LINE %d, FUNC %s, After load SS......", __FILE__, __LINE__, __func__);
+    //printf("FILE %s, LINE %d, FUNC %s, After load SS......", __FILE__, __LINE__, __func__);
 
     selector = (selector & ~3) | dpl;
     cpu_x86_load_seg_cache(env, R_CS, selector,
@@ -1003,7 +1003,7 @@ static void do_interrupt64(CPUX86State *env, int intno, int is_int,
                    get_seg_limit(e1, e2),
                    e2);
     env->eip = offset;
-    printf("FILE %s, LINE %d, FUNC %s, will jmp InterruptHandler 0x%llX\n", __FILE__, __LINE__, __func__, env->eip);
+    //printf("FILE %s, LINE %d, FUNC %s, will jmp InterruptHandler 0x%llX\n", __FILE__, __LINE__, __func__, env->eip);
 }
 #endif /* TARGET_X86_64 */
 

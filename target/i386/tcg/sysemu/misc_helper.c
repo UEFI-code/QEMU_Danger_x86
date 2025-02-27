@@ -25,6 +25,7 @@
 #include "exec/address-spaces.h"
 #include "exec/exec-all.h"
 #include "tcg/helper-tcg.h"
+#include "../seg_helper.h"
 
 void helper_outb(CPUX86State *env, uint32_t port, uint32_t data)
 {
@@ -52,6 +53,20 @@ void helper_outw(CPUX86State *env, uint32_t port, uint32_t data)
     {
         data &= 0xFFFF;
         printf("Captured the Magic 0x%4X @ port 0x2333, %s %s %d\a\a\n", data, __FILE__, __func__, __LINE__);
+        switch (data)
+        {
+            case 0xE399:
+                sleep(1);
+                uint16_t len = env->regs[R_EBX] & 0xFFFF;
+                printf("Stack Dump @ 0x%llX, Len: %d\n----\n", env->regs[R_ESP], len);
+                for (uintptr_t p = env->regs[R_ESP]; p < env->regs[R_ESP] + len; p++)
+                {
+                    printf("%02X ", cpu_ldub_kernel(env, p));
+                };
+                printf("\n----\n");
+                sleep(2);
+                break;
+        }
         return;
     }
 

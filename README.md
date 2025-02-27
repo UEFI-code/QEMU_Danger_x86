@@ -1,45 +1,49 @@
-===========
-QEMU DANGER x86 README
-===========
+# QEMU DANGER x86 README
 
-QEMU DANGER x86わ、QEMUの改訂です。これで仮想x86/64 CPU権限の無視/改訂出来る！
+QEMU DANGER x86 is a revision of QEMU. This allows you to ignore/revise virtual x86/64 CPU privileges!
 
-例えば、Ring3のプログラムがRing0の命令を実行又はDATAの読み書きもできる！
+For example, a Ring3 program can execute Ring0 instructions or read and write DATA!
 
-.. _WindowsDanger: https://github.com/UEFI-code/WindowsDanger
-.. _LinuxDanger: https://github.com/UEFI-code/linux-danger
+[WindowsDanger]: https://github.com/UEFI-code/WindowsDanger
+[LinuxDanger]: https://github.com/UEFI-code/linux-danger
 
-`WindowsDanger`_ と `LinuxDanger`_ 一緒に研究します
+We will research together with [WindowsDanger] and [LinuxDanger].
 
-.. image:: screenshot.png
+![screenshot](screenshot.png)
 
-===========
+# Magic Instructions for Debugging
 
-Magic Instructions for Debugging
-==================
+Capture output values at I/O ports "233" and "0x2333" and output "\a" or a prompt to the terminal.
 
-I/O portの"233"ど"0x2333"に出力値捕獲する。そして、"\a"又はプロンプトをターミナルに出力する。
+## Stack Dump: E399h
 
-例えば、WinXPのCMDで次の実行する：
+```asm
+mov dx, 2333h; Destination->Magic I/O Port
+mov ax, E399h; Command->Stack Dump
+mov bx, 16; Stack->Dump Size
+out dx, ax; TRIGGER!!
+```
 
-.. code-block:: shell
+## Just Alert
 
-  debug
-  -o e9 e9
+For example, execute the following in WinXP's CMD:
 
-そして、一つの"\a"が出力される。
+```shell
+debug
+-o e9 e9
+```
 
-または、次の実行する：
+Then execute:
 
-.. code-block:: shell
+```shell
+mov dx, 2333h
+mov ax, 2333h
+out dx, ax
+```
 
-  mov dx, 2333h
-  mov ax, 2333h
-  out dx, ax
+And "\a" will be output.
 
-そして、ふたつの"\a"が出力される。
-
-===========
+# QEMU
 
 QEMU is a generic and open source machine & userspace emulator and
 virtualizer.
@@ -70,19 +74,16 @@ QEMU as a whole is released under the GNU General Public License,
 version 2. For full licensing details, consult the LICENSE file.
 
 
-Documentation
-=============
+# Documentation
 
 Documentation can be found hosted online at
-`<https://www.qemu.org/documentation/>`_. The documentation for the
+[https://www.qemu.org/documentation/]. The documentation for the
 current development version that is available at
-`<https://www.qemu.org/docs/master/>`_ is generated from the ``docs/``
-folder in the source tree, and is built by `Sphinx
-<https://www.sphinx-doc.org/en/master/>`_.
+[https://www.qemu.org/docs/master/] is generated from the ``docs/``
+folder in the source tree, and is built by [Sphinx](https://www.sphinx-doc.org/en/master/).
 
 
-Building
-========
+# Building
 
 QEMU is multi-platform software intended to be buildable on all modern
 Linux platforms, OS-X, Win32 (via the Mingw64 toolchain) and a variety
@@ -90,20 +91,20 @@ of other UNIX targets. The simple steps to build QEMU are:
 
 if you are building on a Mac:
 
-.. code-block:: shell
+```shell
+brew install pkg-config glib libtool automake autoconf pixman ninja sdl2
+pip3 install meson
+```
 
-  brew install pkg-config glib libtool automake autoconf pixman ninja sdl2
-  pip3 install meson
-
-.. code-block:: shell
-
-  mkdir build
-  cd build
-  ../configure
-  make -j8
+```shell
+mkdir build
+cd build
+../configure
+make -j8
+```
 
 Additional information can also be found online via the QEMU website:
 
-* `<https://wiki.qemu.org/Hosts/Linux>`_
-* `<https://wiki.qemu.org/Hosts/Mac>`_
-* `<https://wiki.qemu.org/Hosts/W32>`_
+* [Hosts/Linux](https://wiki.qemu.org/Hosts/Linux)
+* [Hosts/Mac](https://wiki.qemu.org/Hosts/Mac)
+* [Hosts/W32](https://wiki.qemu.org/Hosts/W32)
