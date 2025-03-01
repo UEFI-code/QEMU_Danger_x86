@@ -967,7 +967,7 @@ static void do_interrupt64(CPUX86State *env, int intno, int is_int,
         esp = env->regs[R_ESP];
     }
     esp &= ~0xfLL; /* align stack */
-    //printf("After align stack, esp = 0x%llX, env-segs[R_SS].selector = 0x%llX......", esp, env->segs[R_SS].selector);
+    //printf("IntNo = 0x%X, is_int = %d, has_err_code = %d, err_code = 0x%X, ist = %d, RSP after align = 0x%llX, ISR = 0x%llX......", intno, is_int, has_error_code, error_code, ist, esp, offset);
 
     PUSHQ(esp, env->segs[R_SS].selector);
     //printf("After PUSHQ ss......");

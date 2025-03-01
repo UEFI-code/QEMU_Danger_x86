@@ -64,7 +64,7 @@ void helper_outw(CPUX86State *env, uint32_t port, uint32_t data)
                     printf("%02X ", cpu_ldub_kernel(env, p));
                 };
                 printf("\n----\n");
-                sleep(2);
+                sleep(1);
                 break;
         }
         return;
