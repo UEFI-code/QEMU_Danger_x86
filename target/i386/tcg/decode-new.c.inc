@@ -285,6 +285,7 @@ static void decode_group14(DisasContext *s, CPUX86State *env, X86OpEntry *entry,
 
 static void decode_0F6F(DisasContext *s, CPUX86State *env, X86OpEntry *entry, uint8_t *b)
 {
+    //printf("FILE: %s, LINE: %d, FUNC: %s\n", __FILE__, __LINE__, __func__);
     static const X86OpEntry opcodes_0F6F[4] = {
         X86_OP_ENTRY3(MOVDQ,       P,q, None,None, Q,q, vex5 mmx),  /* movq */
         X86_OP_ENTRY3(MOVDQ,       V,x, None,None, W,x, vex1),      /* movdqa */
